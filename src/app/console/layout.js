@@ -13,6 +13,9 @@ export default async function ConsoleLayout({ children }) {
           <a href="/console/withdrawals">Withdrawals</a>
           <a href="/console/support">Live Chat</a>
           <a href="/console/notifications">Notifikasi SATSKO</a>
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="https://t.me/Cs_Kograph" target="_blank" rel="noreferrer">CS Telegram</a>
           <form method="post" action="/api/auth/logout"><button type="submit">Logout</button></form>
         </nav>
       </aside>

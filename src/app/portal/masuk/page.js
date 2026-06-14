@@ -1,4 +1,15 @@
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '../../../lib/auth.js';
+
+function target(user) {
+  if (user.role === 'owner') return '/console';
+  if (!user.plan_code) return '/pricing?required=1';
+  return '/app';
+}
+
 export default async function LoginPage({ searchParams }) {
+  const user = await getCurrentUser();
+  if (user) redirect(target(user));
   const sp = await searchParams;
   const error = sp?.error;
   return (

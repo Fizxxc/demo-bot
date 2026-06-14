@@ -357,6 +357,7 @@ create table if not exists public.web_users (
   plan_expires_at timestamptz,
   tenant_id uuid references public.tenants(id) on delete set null,
   blocked_reason text,
+  notifications_enabled boolean not null default true,
   last_login_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -376,3 +376,41 @@ limit 20;
 ```
 
 Catatan: webhook yang masuk ke log tetapi tidak match ke `payment_invoices`, `plan_purchases`, atau `merchant_deposits` tidak akan otomatis mengubah saldo. Itu perlu direkonsiliasi manual karena sistem belum tahu pembayaran tersebut milik user/customer yang mana.
+
+## Update UI Blue/White + Terminal + Profile
+
+Versi ini menambahkan refresh tampilan putih-biru sesuai logo Kograph Market, layout mobile friendly, navbar responsif, chat CS seperti aplikasi chat, terminal bot yang bisa menerima command, toast kecil kanan atas, loading screen glow, halaman Terms/Privacy, popup notifikasi, dan profile security.
+
+### Migration tambahan
+
+Jalankan di Supabase SQL Editor:
+
+```sql
+-- file: supabase/migrations_profile_settings.sql
+alter table public.web_users
+  add column if not exists notifications_enabled boolean not null default true;
+
+create index if not exists idx_web_users_notifications_enabled
+  on public.web_users(notifications_enabled);
+```
+
+### Terminal Bot
+
+Start/stop bot sekarang ada di halaman **Terminal Bot**, bukan di konfigurasi bot. Command yang tersedia:
+
+```txt
+start
+stop
+status
+clear
+```
+
+### Push Notification
+
+File service worker ada di:
+
+```txt
+public/push-notification.js
+```
+
+Saat user login, browser akan menampilkan popup rekomendasi untuk mengaktifkan notifikasi. Preferensinya bisa diubah dari halaman **Profile**.
