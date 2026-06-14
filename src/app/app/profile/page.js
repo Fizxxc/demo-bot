@@ -31,6 +31,7 @@ export default async function ProfilePage() {
           <h3>Preferensi Notifikasi</h3>
           <p className="muted">Notifikasi dipakai untuk info payment, withdraw, chat CS, dan status bot.</p>
           <form className="form" method="post" action="/api/web/profile/notifications">
+            <input type="hidden" name="returnTo" value="/app/profile" />
             <label className="toggle-line">
               <input type="checkbox" name="enabled" value="1" defaultChecked={user.notifications_enabled !== false} />
               <span>Aktifkan popup dan push notification</span>
@@ -43,6 +44,7 @@ export default async function ProfilePage() {
         <div className="card">
           <h3>Ganti Password</h3>
           <form className="form" method="post" action="/api/web/profile/password">
+            <input type="hidden" name="returnTo" value="/app/profile" />
             <input className="input" type="password" name="oldPassword" placeholder="Password lama" required />
             <input className="input" type="password" name="newPassword" placeholder="Password baru minimal 8 karakter" required />
             <input className="input" type="password" name="confirmPassword" placeholder="Ulangi password baru" required />

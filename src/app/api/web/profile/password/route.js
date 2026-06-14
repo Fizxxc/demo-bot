@@ -11,6 +11,8 @@ export async function POST(req) {
   const oldPassword = String(form.get('oldPassword') || '');
   const newPassword = String(form.get('newPassword') || '');
   const confirmPassword = String(form.get('confirmPassword') || '');
+  const returnTo = String(form.get('returnTo') || (user.role === 'owner' ? '/console/profile' : '/app/profile'));
+  const safeReturnTo = returnTo.startsWith('/console/profile') || returnTo.startsWith('/app/profile') ? returnTo : '/app/profile';
 
   try {
     if (!verifyPassword(oldPassword, user.password_salt, user.password_hash)) throw new Error('password_lama_salah');
@@ -27,8 +29,8 @@ export async function POST(req) {
     const { error } = await db.from('web_users').update({ password_hash: hash, password_salt: salt, updated_at: new Date().toISOString() }).eq('id', user.id);
     if (error) throw error;
     await satskoLog({ userId: user.id, type: 'password_changed', severity: 'success', message: 'Password akun diperbarui.' });
-    return NextResponse.redirect(new URL('/app/profile?success=password_updated', req.url));
+    return NextResponse.redirect(new URL(`${safeReturnTo}?success=password_updated`, req.url));
   } catch (error) {
-    return NextResponse.redirect(new URL(`/app/profile?error=${encodeURIComponent(error.message)}`, req.url));
+    return NextResponse.redirect(new URL(`${safeReturnTo}?error=${encodeURIComponent(error.message)}`, req.url));
   }
 }

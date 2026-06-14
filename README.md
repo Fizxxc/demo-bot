@@ -414,3 +414,26 @@ public/push-notification.js
 ```
 
 Saat user login, browser akan menampilkan popup rekomendasi untuk mengaktifkan notifikasi. Preferensinya bisa diubah dari halaman **Profile**.
+
+## Patch Validasi E-Wallet + Responsive + Owner Profile
+
+Update ini memperbaiki halaman **Owner Console → Validasi E-Wallet** supaya tidak kosong saat relasi Supabase gagal dibaca. Data sekarang diambil langsung dari `merchant_ewallets`, lalu user dipetakan manual dari `web_users`, jadi lebih stabil.
+
+Tambahan lain:
+
+- Halaman **Owner Profile** di `/console/profile`.
+- Profile owner bisa ganti password dan mengatur notifikasi.
+- E-wallet merchant lebih rapi dan mobile friendly.
+- Tabel diberi wrapper responsive agar aman di HP.
+- Validasi e-wallet sekarang memberi toast success/error.
+
+Kalau e-wallet masih kosong, cek langsung dengan SQL:
+
+```sql
+select *
+from merchant_ewallets
+order by created_at desc
+limit 20;
+```
+
+Kalau query itu kosong, berarti submit e-wallet belum masuk ke database. Kalau ada isinya, halaman owner sekarang harus menampilkannya.
