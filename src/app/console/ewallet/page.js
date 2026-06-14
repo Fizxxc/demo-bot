@@ -1,0 +1,6 @@
+import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+
+export default async function ConsoleEwallet() {
+  const { data } = await supabaseAdmin().from('merchant_ewallets').select('*, web_users(email,name)').order('created_at', { ascending: false }).limit(100);
+  return <><div className="topbar"><div><h2>Validasi E-Wallet</h2><p>Konfirmasi akun valid sebelum merchant bisa withdraw.</p></div></div><div className="card"><table className="table"><thead><tr><th>User</th><th>Provider</th><th>Nomor</th><th>Nama</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{(data || []).map((e) => <tr key={e.id}><td>{e.web_users?.email}</td><td>{e.provider}</td><td>{e.account_number}</td><td>{e.account_name}</td><td>{e.status}</td><td>{e.status === 'pending' && <div className="nav-links"><form method="post" action="/api/console/ewallet/review"><input type="hidden" name="id" value={e.id}/><input type="hidden" name="status" value="valid"/><button className="btn primary">Valid</button></form><form method="post" action="/api/console/ewallet/review"><input type="hidden" name="id" value={e.id}/><input type="hidden" name="status" value="rejected"/><button className="btn danger">Tolak</button></form></div>}</td></tr>)}</tbody></table></div></>;
+}

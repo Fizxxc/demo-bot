@@ -1,0 +1,7 @@
+import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+import { formatRupiah } from '../../../lib/money.js';
+
+export default async function ConsoleWithdrawals() {
+  const { data } = await supabaseAdmin().from('withdrawals').select('*, web_users(email,name), merchant_ewallets(provider,account_number,account_name)').order('created_at', { ascending: false }).limit(100);
+  return <><div className="topbar"><div><h2>Withdrawals</h2><p>Setujui/tolak request withdraw. Merchant sudah dipotong saldo saat request dibuat.</p></div></div><div className="card"><table className="table"><thead><tr><th>User</th><th>E-Wallet</th><th>Nominal</th><th>Fee</th><th>Net</th><th>Status</th><th>Aksi</th></tr></thead><tbody>{(data || []).map((w) => <tr key={w.id}><td>{w.web_users?.email}</td><td>{w.merchant_ewallets?.provider} {w.merchant_ewallets?.account_number}</td><td>{formatRupiah(w.amount)}</td><td>{formatRupiah(w.service_fee)}</td><td>{formatRupiah(w.net_amount)}</td><td>{w.status}</td><td>{w.status === 'pending' && <div className="nav-links"><form method="post" action="/api/console/withdrawals/review"><input type="hidden" name="id" value={w.id}/><input type="hidden" name="status" value="approved"/><button className="btn primary">Approve</button></form><form method="post" action="/api/console/withdrawals/review"><input type="hidden" name="id" value={w.id}/><input type="hidden" name="status" value="rejected"/><button className="btn danger">Tolak</button></form></div>}</td></tr>)}</tbody></table></div></>;
+}
