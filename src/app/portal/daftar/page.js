@@ -3,7 +3,7 @@ export default async function RegisterPage({ searchParams }) {
   const error = sp?.error;
   return (
     <main className="container" style={{ maxWidth: 520, padding: '70px 0' }}>
-      <a className="logo" href="/"><span className="logo-mark">⚡</span><span>Kograph Market</span></a>
+      <a className="logo" href="/"><img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" /><span>Kograph Market</span></a>
       <div className="card" style={{ marginTop: 28 }}>
         <span className="badge">Daftar merchant</span>
         <h2 style={{ marginTop: 12 }}>Buat akun</h2>

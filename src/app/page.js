@@ -8,7 +8,7 @@ export default function Home() {
       <div className="container">
         <nav className="nav">
           <a className="logo" href="/">
-            <span className="logo-mark">⚡</span>
+            <img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" />
             <span>Kograph Market</span>
           </a>
           <div className="nav-links">

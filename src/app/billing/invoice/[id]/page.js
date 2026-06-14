@@ -12,7 +12,7 @@ export default async function BillingInvoice({ params, searchParams }) {
   if (!invoice) return <main className="container"><div className="card">Invoice tidak ditemukan.</div></main>;
   return (
     <main className="container" style={{ maxWidth: 760, padding: '48px 0' }}>
-      <a className="logo" href="/"><span className="logo-mark">⚡</span><span>Kograph Market</span></a>
+      <a className="logo" href="/"><img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" /><span>Kograph Market</span></a>
       <div className="card" style={{ marginTop: 24 }}>
         <span className="badge">{type === 'merchant_deposit' ? 'Invoice deposit' : 'Invoice plan'}</span>
         <h2>{type === 'merchant_deposit' ? 'Deposit Saldo Akun' : `Bayar plan ${invoice.plan_code.toUpperCase()}`}</h2>

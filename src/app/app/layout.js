@@ -7,7 +7,7 @@ export default async function MerchantLayout({ children }) {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <a className="logo" href="/app"><span className="logo-mark">⚡</span><span>Merchant</span></a>
+        <a className="logo" href="/app"><img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" /><span>Merchant</span></a>
         <nav className="side-nav">
           <a href="/app">Dashboard</a>
           <a href="/app/bot">Bot Setting</a>

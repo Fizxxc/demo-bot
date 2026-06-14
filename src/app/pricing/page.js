@@ -9,7 +9,7 @@ export default async function PricingPage({ searchParams }) {
   return (
     <main className="container" style={{ padding: '40px 0 80px' }}>
       <nav className="nav">
-        <a className="logo" href="/"><span className="logo-mark">⚡</span><span>Kograph Market</span></a>
+        <a className="logo" href="/"><img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" /><span>Kograph Market</span></a>
         <div className="nav-links">
           {user ? <a className="btn" href={user.role === 'owner' ? '/console' : '/app'}>Dashboard</a> : <a className="btn" href="/portal/masuk">Login</a>}
         </div>

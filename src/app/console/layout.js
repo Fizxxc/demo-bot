@@ -5,7 +5,7 @@ export default async function ConsoleLayout({ children }) {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <a className="logo" href="/console"><span className="logo-mark">🛡️</span><span>Owner Console</span></a>
+        <a className="logo" href="/console"><img className="logo-img" src="/assets/kograph-logo.png" alt="Kograph Market" /><span>Owner Console</span></a>
         <nav className="side-nav">
           <a href="/console">Overview</a>
           <a href="/console/users">Users</a>
