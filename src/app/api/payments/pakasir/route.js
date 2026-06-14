@@ -19,6 +19,27 @@ async function notifyPaid(tenant, customer, amount, newBalance) {
   ).catch((err) => console.warn('Gagal kirim notif deposit:', err.message));
 }
 
+
+async function logWebhook(db, payload, { matchedTable = null, matchedId = null, responseStatus = 200, responseBody = {} } = {}) {
+  try {
+    await db.from('payment_webhook_logs').insert({
+      provider: 'pakasir',
+      order_id: payload?.order_id || null,
+      amount: payload?.amount ? Number(payload.amount) : null,
+      project: payload?.project || null,
+      status: payload?.status || null,
+      payload,
+      matched_table: matchedTable,
+      matched_id: matchedId,
+      response_status: responseStatus,
+      response_body: responseBody
+    });
+  } catch (err) {
+    // Jangan sampai logging membuat webhook gagal.
+    console.warn('payment_webhook_logs warning:', err.message);
+  }
+}
+
 async function handleBotCustomerInvoice(db, invoice, payload) {
   const [{ data: tenant, error: tenantError }, { data: customer, error: customerError }] = await Promise.all([
     db.from('tenants').select('*').eq('id', invoice.tenant_id).maybeSingle(),
@@ -91,17 +112,33 @@ export async function POST(req) {
     const db = supabaseAdmin();
     const { data: invoice, error } = await db.from('payment_invoices').select('*').eq('provider', 'pakasir').eq('order_id', orderId).maybeSingle();
     if (error) throw error;
-    if (invoice) return handleBotCustomerInvoice(db, invoice, payload);
+    if (invoice) {
+      await logWebhook(db, payload, { matchedTable: 'payment_invoices', matchedId: invoice.id, responseBody: { matched: true, table: 'payment_invoices' } });
+      return handleBotCustomerInvoice(db, invoice, payload);
+    }
 
     const { data: purchase, error: purchaseError } = await db.from('plan_purchases').select('*').eq('order_id', orderId).maybeSingle();
     if (purchaseError) throw purchaseError;
-    if (purchase) return handlePlanPurchase(db, purchase, payload);
+    if (purchase) {
+      await logWebhook(db, payload, { matchedTable: 'plan_purchases', matchedId: purchase.id, responseBody: { matched: true, table: 'plan_purchases' } });
+      return handlePlanPurchase(db, purchase, payload);
+    }
 
     const { data: dep, error: depError } = await db.from('merchant_deposits').select('*').eq('order_id', orderId).maybeSingle();
     if (depError) throw depError;
-    if (dep) return handleMerchantDeposit(db, dep, payload);
+    if (dep) {
+      await logWebhook(db, payload, { matchedTable: 'merchant_deposits', matchedId: dep.id, responseBody: { matched: true, table: 'merchant_deposits' } });
+      return handleMerchantDeposit(db, dep, payload);
+    }
 
-    return json({ ok: false, error: 'invoice_not_found' }, 404);
+    const responseBody = {
+      ok: true,
+      warning: 'invoice_not_found',
+      logged: true,
+      message: 'Webhook diterima dan disimpan di payment_webhook_logs, tetapi order_id tidak ditemukan di invoice aktif.'
+    };
+    await logWebhook(db, payload, { responseStatus: 200, responseBody });
+    return json(responseBody, 200);
   } catch (error) {
     return handleRouteError(error);
   }

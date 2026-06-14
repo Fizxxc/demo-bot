@@ -353,3 +353,26 @@ Untuk owner:
 ```bash
 npm run create-owner -- owner@email.com passwordOwner "Nama Owner"
 ```
+
+---
+
+## Update Payment Webhook Logs
+
+Versi ini menambahkan tabel `payment_webhook_logs` untuk menyimpan semua webhook Pakasir, termasuk webhook yang order ID-nya belum ditemukan di invoice aktif.
+
+Jalankan migrasi ini di Supabase SQL Editor:
+
+```txt
+supabase/migrations_payment_webhook_logs.sql
+```
+
+Setelah migrasi, webhook dengan order ID yang belum ada tidak langsung hilang. Payload akan tersimpan di:
+
+```sql
+select *
+from payment_webhook_logs
+order by created_at desc
+limit 20;
+```
+
+Catatan: webhook yang masuk ke log tetapi tidak match ke `payment_invoices`, `plan_purchases`, atau `merchant_deposits` tidak akan otomatis mengubah saldo. Itu perlu direkonsiliasi manual karena sistem belum tahu pembayaran tersebut milik user/customer yang mana.
