@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "seed": "node scripts/seed-products.js",
-    "create-owner": "node scripts/create-owner.js"
+    "create-owner": "node scripts/create-owner.js",
+    "sync-auth-user": "node scripts/sync-auth-user.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",

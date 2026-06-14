@@ -321,3 +321,35 @@ Endpoint:
 ```
 
 Vercel cron sudah disiapkan di `vercel.json` untuk menjalankan pengecekan setiap hari. Jika ingin proteksi tambahan, isi `CRON_SECRET` dan panggil endpoint dengan query/header secret.
+
+---
+
+## Update Auth Supabase
+
+Versi ini sudah membuat akun di **Supabase Authentication > Users** saat user register, bukan hanya di tabel `web_users`.
+
+Untuk database lama, jalankan dulu file ini di Supabase SQL Editor:
+
+```txt
+supabase/migrations_auth_sync.sql
+```
+
+Isi migrasi hanya menambah kolom `auth_user_id`, jadi tidak merusak data lama.
+
+Tambahkan ENV baru:
+
+```env
+SUPABASE_ANON_KEY=xxxxx
+```
+
+Akun lama yang sebelumnya hanya ada di `web_users` akan otomatis disinkronkan ke Supabase Auth saat login berhasil. Kalau ingin sync manual:
+
+```bash
+npm run sync-auth-user -- email@user.com passwordBaru
+```
+
+Untuk owner:
+
+```bash
+npm run create-owner -- owner@email.com passwordOwner "Nama Owner"
+```

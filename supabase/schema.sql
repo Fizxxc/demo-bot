@@ -345,6 +345,7 @@ $$;
 
 create table if not exists public.web_users (
   id uuid primary key default gen_random_uuid(),
+  auth_user_id uuid unique,
   email text not null unique,
   name text not null,
   password_hash text not null,
@@ -487,6 +488,7 @@ create table if not exists public.live_chat_messages (
 );
 
 create index if not exists idx_web_users_role_status on public.web_users(role, status);
+create index if not exists idx_web_users_auth_user_id on public.web_users(auth_user_id);
 create index if not exists idx_plan_purchases_order on public.plan_purchases(order_id);
 create index if not exists idx_merchant_deposits_order on public.merchant_deposits(order_id);
 create index if not exists idx_withdrawals_user_created on public.withdrawals(user_id, created_at desc);
