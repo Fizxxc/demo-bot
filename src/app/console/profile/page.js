@@ -1,13 +1,16 @@
+export const dynamic = 'force-dynamic';
 import { requireOwner } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 export default async function OwnerProfilePage() {
   const owner = await requireOwner();
   const db = supabaseAdmin();
-  const [{ count: usersCount }, { count: pendingEwalletCount }, { count: pendingWithdrawCount }] = await Promise.all([
+  const [{ count: usersCount }, { count: pendingEwalletCount }, { count: pendingWithdrawCount }, { data: sessions }] = await Promise.all([
     db.from('web_users').select('*', { count: 'exact', head: true }),
     db.from('merchant_ewallets').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-    db.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+    db.from('withdrawals').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    db.from('web_sessions').select('id,created_at').eq('user_id', owner.id).order('created_at', { ascending: false }).limit(5)
   ]);
 
   return (
@@ -20,17 +23,42 @@ export default async function OwnerProfilePage() {
         </div>
       </div>
       <div className="grid two">
-        <div className="card profile-card">
-          <div className="profile-avatar">{(owner.name || owner.email || 'K').slice(0, 1).toUpperCase()}</div>
-          <h3>{owner.name}</h3>
-          <p className="muted">{owner.email}</p>
-          <div className="stat-list">
-            <div className="stat"><b>Role</b><p>{owner.role}</p></div>
-            <div className="stat"><b>Status</b><p>{owner.status}</p></div>
-            <div className="stat"><b>Total User</b><p>{usersCount || 0}</p></div>
-            <div className="stat"><b>E-Wallet Pending</b><p>{pendingEwalletCount || 0}</p></div>
-            <div className="stat"><b>Withdraw Pending</b><p>{pendingWithdrawCount || 0}</p></div>
+        <div className="card profile-hero-card">
+          <div className="profile-hero-head">
+            <div className="profile-avatar">{(owner.name || owner.email || 'K').slice(0, 1).toUpperCase()}</div>
+            <div>
+              <h3>{owner.name}</h3>
+              <p className="muted">{owner.email}</p>
+              <div className="feature-pills">
+                <span className="pill good">owner</span>
+                <span className="pill">{owner.status}</span>
+                <span className="pill">{sessions?.length || 0} sesi</span>
+              </div>
+            </div>
           </div>
+          <div className="grid two compact-grid" style={{ marginTop: 12 }}>
+            <div className="stat"><b>Total User</b><strong>{usersCount || 0}</strong></div>
+            <div className="stat"><b>E-Wallet Pending</b><strong>{pendingEwalletCount || 0}</strong></div>
+            <div className="stat"><b>Withdraw Pending</b><strong>{pendingWithdrawCount || 0}</strong></div>
+            <div className="stat"><b>Mode</b><p>Owner Console</p></div>
+          </div>
+        </div>
+
+        <MascotCard
+          image="/assets/mascots/presenter-point.webp"
+          title="Owner profile yang lebih rapi."
+          text="Semua kontrol penting owner, notifikasi, keamanan, dan pintasan operasional dikumpulkan di sini."
+          badge="Owner Mascot"
+        />
+
+        <div className="card">
+          <h3>Informasi Dasar</h3>
+          <form className="form" method="post" action="/api/web/profile/update">
+            <input type="hidden" name="returnTo" value="/console/profile" />
+            <input className="input" type="text" name="name" defaultValue={owner.name || ''} placeholder="Nama owner" required />
+            <input className="input" type="email" value={owner.email || ''} disabled readOnly />
+            <button className="btn primary" type="submit">Simpan Profil</button>
+          </form>
         </div>
 
         <div className="card">

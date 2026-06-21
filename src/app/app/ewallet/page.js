@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic';
 import { requireUser } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 export default async function EwalletPage() {
   const user = await requireUser();
@@ -16,6 +18,12 @@ export default async function EwalletPage() {
       </div>
       {error && <div className="notice">Gagal membaca data e-wallet: {error.message}</div>}
       <div className="grid two">
+        <MascotCard
+          image="/assets/mascots/wave-hello.webp"
+          title="Lengkapi identitas payout."
+          text="Maskot menyambut merchant saat menambahkan akun payout agar alurnya terasa lebih ramah dan jelas."
+          badge="E-Wallet Mascot"
+        />
         <div className="card">
           <h3>Tambah E-Wallet</h3>
           <form className="form" method="post" action="/api/web/ewallet/create">

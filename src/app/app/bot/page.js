@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic';
 import { requireUser } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 export default async function BotSetting() {
   const user = await requireUser();
@@ -26,6 +28,12 @@ export default async function BotSetting() {
             <button className="btn primary" type="submit">Simpan Konfigurasi</button>
           </form>
         </div>
+        <MascotCard
+          image="/assets/mascots/presenter-point.webp"
+          title="Konfigurasi dijelaskan dengan jelas."
+          text="Pose presentasi dipakai untuk halaman pengaturan supaya terasa seperti guided setup yang mudah diikuti."
+          badge="Setting Mascot"
+        />
         <div className="card soft-card">
           <h3>Status Bot</h3>
           <p><span className={`status-dot ${tenant?.is_active ? 'on' : ''}`}></span> {tenant?.is_active ? 'Running' : 'Stopped'}</p>

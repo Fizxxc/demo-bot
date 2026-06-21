@@ -1,7 +1,9 @@
+export const dynamic = 'force-dynamic';
 import { requireUser } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
 import { formatRupiah } from '../../../lib/money.js';
 import { getMonthlyLimit, WITHDRAW_FEE_RATE, WITHDRAW_MAX, WITHDRAW_MIN } from '../../../lib/walletRules.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 export default async function WalletPage() {
   const user = await requireUser();
@@ -13,7 +15,7 @@ export default async function WalletPage() {
   ]);
   return (
     <>
-      <div className="topbar"><div><h2>Deposit & Withdraw</h2><p>Withdraw hanya hari Sabtu. Biaya layanan {WITHDRAW_FEE_RATE * 100}%. Minimal {formatRupiah(WITHDRAW_MIN)}, maksimal {formatRupiah(WITHDRAW_MAX)} per request.</p></div></div>
+      <div className="topbar"><div><p className="eyebrow">Merchant Wallet</p><h2>Deposit & Withdraw</h2><p>Withdraw hanya hari Sabtu. Biaya layanan {WITHDRAW_FEE_RATE * 100}%. Minimal {formatRupiah(WITHDRAW_MIN)}, maksimal {formatRupiah(WITHDRAW_MAX)} per request.</p></div></div>
       <div className="stats">
         <div className="stat">Saldo Penjualan<strong>{formatRupiah(wallet?.merchant_balance || 0)}</strong></div>
         <div className="stat">Saldo Akun<strong>{formatRupiah(wallet?.available_balance || 0)}</strong></div>
@@ -21,6 +23,12 @@ export default async function WalletPage() {
         <div className="stat">Fee Withdraw<strong>10%</strong></div>
       </div>
       <div className="grid two" style={{ marginTop: 18 }}>
+        <MascotCard
+          image="/assets/mascots/profile-thumbs-up.webp"
+          title="Wallet lebih nyaman dipakai."
+          text="Info saldo, cairkan merchant balance, QRIS deposit, dan withdraw sekarang tersusun lebih rapi."
+          badge="Wallet Mascot"
+        />
         <div className="card"><h3>Cairkan Saldo Penjualan</h3><p>Pindahkan saldo hasil pembelian bot ke Saldo Akun agar bisa withdraw.</p><form method="post" action="/api/web/wallet/settle"><button className="btn primary" type="submit">Cairkan Semua</button></form></div>
         <div className="card"><h3>Deposit Saldo Akun</h3><form className="form" method="post" action="/api/web/wallet/deposit"><input className="input" name="amount" placeholder="Nominal deposit" required /><button className="btn" type="submit">Buat QRIS Deposit</button></form></div>
       </div>

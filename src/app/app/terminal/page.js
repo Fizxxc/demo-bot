@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic';
 import { requireUser } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 export default async function TerminalPage() {
   const user = await requireUser();
@@ -15,7 +17,7 @@ export default async function TerminalPage() {
         <div>
           <p className="eyebrow">Runtime Control</p>
           <h2>Terminal Bot</h2>
-          <p>Jalankan bot, matikan webhook, dan pantau proses seperti command center.</p>
+          <p>Jalankan bot, matikan webhook, dan pantau proses secara detail seperti command center.</p>
         </div>
         <span className="badge"><span className={`status-dot ${tenant?.is_active ? 'on' : ''}`}></span> {tenant?.is_active ? 'ONLINE' : 'OFFLINE'}</span>
       </div>
@@ -44,16 +46,25 @@ export default async function TerminalPage() {
           </form>
         </div>
 
-        <div className="card">
-          <h3>Quick Actions</h3>
-          <div className="quick-actions">
-            <form method="post" action="/api/web/bot/start"><button className="btn primary wide" type="submit">▶ Start Bot</button></form>
-            <form method="post" action="/api/web/bot/stop"><button className="btn danger wide" type="submit">■ Stop Bot</button></form>
-          </div>
-          <div className="stat-list">
-            <div className="stat"><b>Tenant ID</b><p>{tenant?.id || 'Belum ada tenant. Simpan konfigurasi bot dulu.'}</p></div>
-            <div className="stat"><b>Bot Username</b><p>{tenant?.bot_username ? `@${tenant.bot_username}` : 'Belum terbaca'}</p></div>
-            <div className="stat"><b>Store</b><p>{tenant?.store_name || '-'}</p></div>
+        <div className="grid">
+          <MascotCard
+            image="/assets/mascots/celebrate-jump.webp"
+            title="Kontrol bot dari bawah jari kamu."
+            text="Terminal sekarang jadi pusat start/stop bot, lengkap dengan log proses dan command manual."
+            badge="Terminal Mascot"
+            compact
+          />
+          <div className="card">
+            <h3>Quick Actions</h3>
+            <div className="quick-actions">
+              <form method="post" action="/api/web/bot/start"><button className="btn primary wide" type="submit">▶ Start Bot</button></form>
+              <form method="post" action="/api/web/bot/stop"><button className="btn danger wide" type="submit">■ Stop Bot</button></form>
+            </div>
+            <div className="stat-list">
+              <div className="stat"><b>Tenant ID</b><p>{tenant?.id || 'Belum ada tenant. Simpan konfigurasi bot dulu.'}</p></div>
+              <div className="stat"><b>Bot Username</b><p>{tenant?.bot_username ? `@${tenant.bot_username}` : 'Belum terbaca'}</p></div>
+              <div className="stat"><b>Store</b><p>{tenant?.store_name || '-'}</p></div>
+            </div>
           </div>
         </div>
       </div>

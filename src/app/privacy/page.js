@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 export default function PrivacyPage() {
   return (
     <main className="container" style={{ maxWidth: 860, padding: '46px 0' }}>

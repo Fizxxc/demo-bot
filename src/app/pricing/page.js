@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { listPlans } from '../../lib/plans.js';
 import { formatRupiah } from '../../lib/money.js';
 import { getCurrentUser } from '../../lib/auth.js';

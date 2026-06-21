@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
 
 export default async function NotificationsPage() {

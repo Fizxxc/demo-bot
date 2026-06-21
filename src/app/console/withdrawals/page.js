@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
 import { formatRupiah } from '../../../lib/money.js';
 

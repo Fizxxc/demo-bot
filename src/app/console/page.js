@@ -1,5 +1,7 @@
+export const dynamic = 'force-dynamic';
 import { supabaseAdmin } from '../../lib/supabaseAdmin.js';
 import { formatRupiah } from '../../lib/money.js';
+import MascotCard from '../../components/MascotCard.js';
 
 export default async function OwnerConsole() {
   const db = supabaseAdmin();
@@ -21,7 +23,20 @@ export default async function OwnerConsole() {
         <div className="stat">Pending Withdraw<strong>{formatRupiah(pendingWd)}</strong></div>
         <div className="stat">Total Wallet<strong>{formatRupiah(totalWallet)}</strong></div>
       </div>
-      <div className="card" style={{ marginTop: 18 }}><h3>Notifikasi SATSKO terbaru</h3>{(notifications.data || []).map((n) => <div className="stat" key={n.id}><b>{n.title}</b><p>{n.message}</p></div>)}</div>
+      <div className="grid two" style={{ marginTop: 18 }}>
+        <MascotCard
+          image="/assets/mascots/presenter-point.webp"
+          title="Owner control center"
+          text="Pantau merchant, proses validasi, dan respon chat dari satu dashboard ringkas dengan nuansa putih-biru yang konsisten."
+          badge="Console Mascot"
+        />
+        <div className="card">
+          <h3>Notifikasi SATSKO terbaru</h3>
+          {(notifications.data || []).length ? (notifications.data || []).map((n) => (
+            <div className="stat" key={n.id}><b>{n.title}</b><p>{n.message}</p></div>
+          )) : <p className="muted">Belum ada notifikasi terbaru.</p>}
+        </div>
+      </div>
     </>
   );
 }

@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic';
 import { requireUser } from '../../../lib/auth.js';
 import { supabaseAdmin } from '../../../lib/supabaseAdmin.js';
 import AutoAiReply from './AutoAiReply.js';
+import MascotCard from '../../../components/MascotCard.js';
 
 function senderLabel(role) {
   if (role === 'ai') return 'SATSKO AI';
@@ -30,36 +32,45 @@ export default async function SupportPage() {
         </div>
         <a className="btn" href="https://t.me/Cs_Kograph" target="_blank" rel="noreferrer">Telegram @Cs_Kograph</a>
       </div>
-      <div className="card chat-card">
-        <div className="chat-header">
-          <div><b>CS Kograph</b><p>Biasanya membalas secepat mungkin</p></div>
-          <span className="pill good">online</span>
-        </div>
-        <div className="chat-box">
-          {(messages || []).map((m) => {
-            const mine = m.sender_role === 'merchant';
-            return (
-              <div key={m.id} className={`chat-row ${mine ? 'right' : 'left'}`}>
-                <div className="chat-bubble">
-                  <span>{senderLabel(m.sender_role)}</span>
-                  <p>{m.message}</p>
-                  <small>{new Date(m.created_at).toLocaleString('id-ID')}</small>
+      <div className="grid two chat-layout">
+        <MascotCard
+          image="/assets/mascots/wave-hello.webp"
+          title="CS room yang lebih ramah."
+          text="Pesan kamu muncul di kanan, balasan owner dan SATSKO AI di kiri, seperti aplikasi chat modern."
+          badge="Support Mascot"
+          compact
+        />
+        <div className="card chat-card">
+          <div className="chat-header">
+            <div><b>CS Kograph</b><p>Biasanya membalas secepat mungkin</p></div>
+            <span className="pill good">online</span>
+          </div>
+          <div className="chat-box">
+            {(messages || []).map((m) => {
+              const mine = m.sender_role === 'merchant';
+              return (
+                <div key={m.id} className={`chat-row ${mine ? 'right' : 'left'}`}>
+                  <div className="chat-bubble">
+                    <span>{senderLabel(m.sender_role)}</span>
+                    <p>{m.message}</p>
+                    <small>{new Date(m.created_at).toLocaleString('id-ID')}</small>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-          {!messages?.length && <div className="empty-chat">Mulai chat dengan CS Kograph. Tanyakan tentang bot, pembayaran, withdraw, atau fitur dashboard.</div>}
+              );
+            })}
+            {!messages?.length && <div className="empty-chat">Mulai chat dengan CS Kograph. Tanyakan tentang bot, pembayaran, withdraw, atau fitur dashboard.</div>}
+          </div>
+          <form className="chat-compose" method="post" action="/api/web/chat/send">
+            <input type="hidden" name="threadId" value={thread.id} />
+            <textarea name="message" placeholder="Tulis pesan kamu..." required />
+            <button className="btn primary" type="submit">Kirim</button>
+          </form>
+          <form method="post" action="/api/web/chat/ai-reply" style={{ marginTop: 10 }}>
+            <input type="hidden" name="threadId" value={thread.id} />
+            <button className="btn" type="submit">Minta SATSKO jawab sekarang</button>
+          </form>
+          <AutoAiReply threadId={thread.id} shouldRun={shouldAutoAi} />
         </div>
-        <form className="chat-compose" method="post" action="/api/web/chat/send">
-          <input type="hidden" name="threadId" value={thread.id} />
-          <textarea name="message" placeholder="Tulis pesan kamu..." required />
-          <button className="btn primary" type="submit">Kirim</button>
-        </form>
-        <form method="post" action="/api/web/chat/ai-reply" style={{ marginTop: 10 }}>
-          <input type="hidden" name="threadId" value={thread.id} />
-          <button className="btn" type="submit">Minta SATSKO jawab sekarang</button>
-        </form>
-        <AutoAiReply threadId={thread.id} shouldRun={shouldAutoAi} />
       </div>
     </>
   );
