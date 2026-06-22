@@ -1,14 +1,15 @@
 export const dynamic = 'force-dynamic';
+import { BadgeCheck, Bell, CircleDollarSign, LayoutDashboard, MessageCircle, ShieldCheck, UserRound, Users, WalletCards } from 'lucide-react';
 import { requireOwner } from '../../lib/auth.js';
 import BottomNav from '../../components/BottomNav.js';
 
 const navItems = [
-  { href: '/console', label: 'Overview', icon: '📊' },
-  { href: '/console/users', label: 'Users', icon: '👥' },
-  { href: '/console/ewallet', label: 'E-Wallet', icon: '✅' },
-  { href: '/console/withdrawals', label: 'Withdraw', icon: '💸' },
-  { href: '/console/support', label: 'Chat', icon: '💬' },
-  { href: '/console/profile', label: 'Profil', icon: '🛡️' }
+  { href: '/console', label: 'Overview', icon: LayoutDashboard },
+  { href: '/console/users', label: 'Users', icon: Users },
+  { href: '/console/ewallet', label: 'E-Wallet', icon: BadgeCheck },
+  { href: '/console/withdrawals', label: 'Withdraw', icon: CircleDollarSign },
+  { href: '/console/support', label: 'Chat', icon: MessageCircle },
+  { href: '/console/profile', label: 'Profil', icon: ShieldCheck }
 ];
 
 export default async function ConsoleLayout({ children }) {
@@ -28,16 +29,16 @@ export default async function ConsoleLayout({ children }) {
           </div>
         </div>
         <nav className="side-nav">
-          <a href="/console">Overview</a>
-          <a href="/console/users">Users</a>
-          <a href="/console/ewallet">Validasi E-Wallet</a>
-          <a href="/console/withdrawals">Withdrawals</a>
-          <a href="/console/support">Live Chat</a>
-          <a href="/console/notifications">Notifikasi SATSKO</a>
-          <a href="/console/profile">Profile</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="https://t.me/Cs_Kograph" target="_blank" rel="noreferrer">CS Telegram</a>
+          <a href="/console"><LayoutDashboard size={17} /> Overview</a>
+          <a href="/console/users"><Users size={17} /> Users</a>
+          <a href="/console/ewallet"><BadgeCheck size={17} /> Validasi E-Wallet</a>
+          <a href="/console/withdrawals"><CircleDollarSign size={17} /> Withdrawals</a>
+          <a href="/console/support"><MessageCircle size={17} /> Live Chat</a>
+          <a href="/console/notifications"><Bell size={17} /> Notifikasi SATSKO</a>
+          <a href="/console/profile"><UserRound size={17} /> Profile</a>
+          <a href="/terms"><ShieldCheck size={17} /> Terms</a>
+          <a href="/privacy"><WalletCards size={17} /> Privacy</a>
+          <a href="https://t.me/Cs_Kograph" target="_blank" rel="noreferrer"><MessageCircle size={17} /> CS Telegram</a>
           <form method="post" action="/api/auth/logout"><button type="submit">Logout</button></form>
         </nav>
       </aside>

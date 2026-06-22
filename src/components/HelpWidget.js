@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { MessageCircle, Send, Sparkles, X } from 'lucide-react';
 
 const PROMPTS = [
   'Kenapa bot Telegram saya tidak respon?',
@@ -26,11 +27,11 @@ export default function HelpWidget({ enabled = false }) {
         <div className="help-panel">
           <div className="help-panel-head">
             <div>
-              <span className="eyebrow">SATSKO Help</span>
+              <span className="eyebrow"><Sparkles size={14} /> SATSKO Help</span>
               <h3>Butuh bantuan cepat?</h3>
               <p>Pilih prompt atau tulis kendala. SATSKO akan menjawab dan menyimpan ke Live Chat.</p>
             </div>
-            <button className="help-close" onClick={() => setOpen(false)} type="button">×</button>
+            <button className="help-close" onClick={() => setOpen(false)} type="button" aria-label="Tutup help widget"><X size={17} /></button>
           </div>
           <div className="prompt-list">
             {PROMPTS.map((prompt) => (
@@ -40,12 +41,12 @@ export default function HelpWidget({ enabled = false }) {
           <form className="help-form" method="post" action="/api/web/chat/widget">
             <input type="hidden" name="returnTo" value={returnTo} />
             <textarea name="message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="Tulis pertanyaan kamu..." required />
-            <button className="btn primary wide" type="submit">Kirim ke SATSKO</button>
+            <button className="btn primary wide" type="submit"><Send size={16} /> Kirim ke SATSKO</button>
           </form>
         </div>
       )}
       <button className="help-fab" onClick={() => setOpen((value) => !value)} type="button">
-        <span>💬</span>
+        <span><MessageCircle size={18} /></span>
         <b>Help</b>
       </button>
     </div>

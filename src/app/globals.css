@@ -445,3 +445,31 @@ body {
   .help-widget { top:auto; right:14px; bottom:94px; }
   .help-panel { max-height:70vh; overflow:auto; }
 }
+
+/* Professional polish: lighter typography, lucide-friendly buttons, bottom-right help */
+body { font-weight: 400; }
+p, .muted, .stat, .mini-line span, .table td { font-weight: 400; }
+h1, h2 { font-weight: 760; letter-spacing: -0.045em; }
+h3, .logo, .badge, .pill, .btn { font-weight: 650; }
+.btn, .side-nav a, .side-nav button, .eyebrow, .badge, .pill { display: inline-flex; align-items: center; gap: 8px; }
+.side-nav { align-items: stretch; }
+.side-nav a, .side-nav button { justify-content: flex-start; }
+.stat strong { font-weight: 720; }
+.table th { font-weight: 650; }
+.toast { display:flex; align-items:center; gap:8px; font-weight:600; }
+.help-widget { top: auto !important; bottom: 24px !important; right: 24px !important; }
+.help-fab { min-width: 112px; justify-content:center; }
+.help-fab b { font-weight: 650; }
+.help-close { display:grid; place-items:center; }
+.professional-footer { margin-top: 28px; padding: 36px 0 44px; background: rgba(255,255,255,.42); border-top: 1px solid rgba(241,245,249,.9); }
+.footer-grid { display:grid; grid-template-columns: 1.5fr .7fr .7fr; gap: 24px; align-items:start; }
+.footer-grid p { max-width: 440px; margin: 12px 0 0; }
+.footer-grid div:not(:first-child) { display:grid; gap: 10px; }
+.footer-grid b { color:#0f172a; font-weight: 680; }
+.footer-grid a { color:#64748b; }
+.footer-grid a:hover { color:#2C5BFF; }
+@media (max-width: 760px) {
+  .help-widget { right: 14px !important; bottom: 94px !important; }
+  .help-fab { min-width: 98px; }
+  .footer-grid { grid-template-columns:1fr; }
+}
