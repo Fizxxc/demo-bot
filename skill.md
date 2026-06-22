@@ -50,3 +50,11 @@ Before zipping:
 - Lucky Spin adalah paid random reward, bukan giveaway gratis.
 - Hadiah spin harus berasal dari `spin_prizes` agar owner bisa mengatur stok hadiah.
 - Jika QRIS produk sukses tapi stok habis, refund otomatis ke saldo user.
+
+## Lucky Spin Batch Skill
+
+- User harus bisa memilih jumlah spin sebelum membayar: x1, x3, x5, x10, atau x20.
+- Total pembayaran spin = tier_amount × spin_count.
+- Jika reward berformat `SALDO:nominal`, sistem harus mengkredit saldo user maksimal Rp100.000 per hadiah.
+- Hasil batch spin disimpan ke `spin_orders.results` dalam JSON.
+- Ringkasan batch spin dikirim sebagai file jika spin lebih dari satu atau ada hadiah text.

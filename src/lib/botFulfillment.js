@@ -188,107 +188,159 @@ export async function resolveSpinOrder({ db, tenant, customer, spinOrder, detail
 
   if (spinOrder.status === 'paid' && spinOrder.result) {
     await sendMessage(tenant.bot_token, customer.telegram_user_id, '✅ Spin ini sudah diproses sebelumnya.', { reply_markup: inlineKeyboard([[{ text: '🎰 Spin Lagi', callback_data: 'spin' }]]) }).catch(() => {});
-    return { ok: true, already_paid: true, result: spinOrder.result };
+    return { ok: true, already_paid: true, result: spinOrder.result, results: spinOrder.results || [] };
   }
 
   const tier = spinTierInfo(spinOrder.tier_amount);
   if (!tier) throw new Error('invalid_spin_tier');
 
+  const spinCount = Math.max(1, Math.min(20, Number(spinOrder.spin_count || 1)));
+  const totalPayment = Number(spinOrder.total_payment || (tier.amount * spinCount));
+  const now = new Date().toISOString();
+  const results = [];
+  const wonPrizeIds = [];
+  let totalBalanceReward = 0;
+
   await runSpinAnimation(tenant, customer.telegram_user_id);
 
-  const shouldWin = crypto.randomInt(100) < tier.chance;
-  let prize = null;
+  for (let i = 1; i <= spinCount; i += 1) {
+    const shouldWin = crypto.randomInt(100) < tier.chance;
+    let prize = null;
 
-  if (shouldWin) {
-    const { data: prizes, error: prizeError } = await db
-      .from('spin_prizes')
-      .select('*')
-      .eq('tenant_id', tenant.id)
-      .eq('status', 'available')
-      .lte('tier_min', Number(spinOrder.tier_amount))
-      .limit(80);
-    if (prizeError) throw prizeError;
-    if (prizes?.length) prize = prizes[crypto.randomInt(prizes.length)];
+    if (shouldWin) {
+      const { data: prizes, error: prizeError } = await db
+        .from('spin_prizes')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'available')
+        .lte('tier_min', Number(spinOrder.tier_amount))
+        .limit(80);
+      if (prizeError) throw prizeError;
+      if (prizes?.length) prize = prizes[crypto.randomInt(prizes.length)];
+    }
+
+    if (!prize) {
+      results.push({ index: i, result: 'zonk' });
+      continue;
+    }
+
+    await db.from('spin_prizes').update({
+      status: 'won',
+      won_by_customer_id: customer.id,
+      won_spin_order_id: spinOrder.id,
+      won_at: now
+    }).eq('id', prize.id).eq('status', 'available');
+
+    wonPrizeIds.push(prize.id);
+
+    if (prize.reward_type === 'balance') {
+      const balanceAmount = Math.max(0, Math.min(100000, Number(prize.balance_amount || 0)));
+      totalBalanceReward += balanceAmount;
+      results.push({
+        index: i,
+        result: 'win',
+        prize_id: prize.id,
+        prize_name: prize.name,
+        reward_type: 'balance',
+        balance_amount: balanceAmount
+      });
+    } else {
+      results.push({
+        index: i,
+        result: 'win',
+        prize_id: prize.id,
+        prize_name: prize.name,
+        reward_type: 'text',
+        reward_text: prize.reward_text,
+        note: prize.note || null
+      });
+    }
   }
 
-  const now = new Date().toISOString();
-
-  if (!prize) {
-    await db.from('spin_orders').update({
-      status: 'paid',
-      result: 'zonk',
-      raw: { ...(spinOrder.raw || {}), detail },
-      resolved_at: now,
-      updated_at: now
-    }).eq('id', spinOrder.id);
-
-    await db.from('transactions').insert({
-      tenant_id: tenant.id,
-      customer_id: customer.id,
-      type: 'BELI',
-      amount: Number(spinOrder.tier_amount),
-      description: `${tier.label} - ZONK`,
-      meta: { spin_order_id: spinOrder.id, result: 'zonk', pay_method: spinOrder.pay_method }
-    });
-
-    await sendMessage(
-      tenant.bot_token,
-      customer.telegram_user_id,
-      `😵 <b>ZONK!</b>\n\nBelum beruntung di <b>${esc(tier.label)}</b>.\nKamu bisa coba tier yang lebih tinggi untuk peluang lebih besar.`,
-      { reply_markup: inlineKeyboard([[{ text: '🎰 Spin Lagi', callback_data: 'spin' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]) }
-    ).catch(() => {});
-
-    return { ok: true, result: 'zonk' };
-  }
-
-  await db.from('spin_prizes').update({
-    status: 'won',
-    won_by_customer_id: customer.id,
-    won_spin_order_id: spinOrder.id,
-    won_at: now
-  }).eq('id', prize.id).eq('status', 'available');
-
-  await db.from('spin_orders').update({
-    status: 'paid',
-    result: 'win',
-    prize_id: prize.id,
-    raw: { ...(spinOrder.raw || {}), detail },
-    resolved_at: now,
-    updated_at: now
-  }).eq('id', spinOrder.id);
+  const anyWin = results.some((item) => item.result === 'win');
 
   await db.from('transactions').insert({
     tenant_id: tenant.id,
     customer_id: customer.id,
     type: 'BELI',
-    amount: Number(spinOrder.tier_amount),
-    description: `${tier.label} - WIN ${prize.name}`,
-    meta: { spin_order_id: spinOrder.id, prize_id: prize.id, result: 'win', pay_method: spinOrder.pay_method }
+    amount: totalPayment,
+    description: `${tier.label} x${spinCount} - ${anyWin ? 'WIN' : 'ZONK'}`,
+    meta: { spin_order_id: spinOrder.id, result: anyWin ? 'win' : 'zonk', spin_count: spinCount, pay_method: spinOrder.pay_method }
   });
 
-  const rewardText =
-    `HADIAH LUCKY SPIN\n` +
+  let newBalance = null;
+  if (totalBalanceReward > 0) {
+    await db.from('balances').upsert({ tenant_id: tenant.id, customer_id: customer.id, amount: 0 }, { onConflict: 'customer_id', ignoreDuplicates: true });
+    const { data: balance } = await db.from('balances').select('amount').eq('customer_id', customer.id).maybeSingle();
+    newBalance = Number(balance?.amount || 0) + totalBalanceReward;
+    await db.from('balances').update({ amount: newBalance, updated_at: new Date().toISOString() }).eq('customer_id', customer.id);
+    await db.from('transactions').insert({
+      tenant_id: tenant.id,
+      customer_id: customer.id,
+      type: 'ADJUSTMENT',
+      amount: totalBalanceReward,
+      description: `Hadiah saldo Lucky Spin x${spinCount}`,
+      meta: { spin_order_id: spinOrder.id, total_balance_reward: totalBalanceReward }
+    });
+  }
+
+  await db.from('spin_orders').update({
+    status: 'paid',
+    result: anyWin ? 'win' : 'zonk',
+    prize_id: wonPrizeIds[0] || null,
+    results,
+    raw: { ...(spinOrder.raw || {}), detail },
+    resolved_at: now,
+    updated_at: now
+  }).eq('id', spinOrder.id);
+
+  const winCount = results.filter((item) => item.result === 'win').length;
+  const zonkCount = results.filter((item) => item.result === 'zonk').length;
+  const textRewards = results.filter((item) => item.result === 'win' && item.reward_type !== 'balance');
+  const balanceRewards = results.filter((item) => item.result === 'win' && item.reward_type === 'balance');
+
+  const summaryText =
+    `HASIL LUCKY SPIN\n` +
     `Order: ${spinOrder.order_id || spinOrder.id}\n` +
     `Tier: ${tier.label}\n` +
-    `Hadiah: ${prize.name}\n\n` +
-    `${prize.reward_text}\n\n` +
-    `${prize.note ? `Catatan: ${prize.note}\n` : ''}` +
-    `Tanggal: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB\n`;
+    `Jumlah Spin: x${spinCount}\n` +
+    `Total Bayar: ${formatRupiah(totalPayment)}\n` +
+    `Menang: ${winCount}\n` +
+    `Zonk: ${zonkCount}\n` +
+    `Bonus Saldo: ${formatRupiah(totalBalanceReward)}\n\n` +
+    results.map((item) => {
+      if (item.result === 'zonk') return `Spin #${item.index}: ZONK`;
+      if (item.reward_type === 'balance') return `Spin #${item.index}: WIN - ${item.prize_name} (${formatRupiah(item.balance_amount)})`;
+      return `Spin #${item.index}: WIN - ${item.prize_name}\n${item.reward_text}${item.note ? `\nCatatan: ${item.note}` : ''}`;
+    }).join('\n\n') +
+    `\n\nTanggal: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB\n`;
 
-  await sendDocumentBuffer(
-    tenant.bot_token,
-    customer.telegram_user_id,
-    Buffer.from(rewardText, 'utf8'),
-    `hadiah-spin-${spinOrder.order_id || spinOrder.id}.txt`,
-    `🎉 <b>SELAMAT!</b> Kamu mendapatkan <b>${esc(prize.name)}</b>. Hadiah dikirim sebagai file.`
-  ).catch((err) => console.warn('send spin reward failed:', err.message));
+  if (textRewards.length > 0 || spinCount > 1) {
+    await sendDocumentBuffer(
+      tenant.bot_token,
+      customer.telegram_user_id,
+      Buffer.from(summaryText, 'utf8'),
+      `hasil-spin-${spinOrder.order_id || spinOrder.id}.txt`,
+      anyWin
+        ? `🎉 <b>Hasil Lucky Spin x${spinCount}</b>\nMenang: <b>${winCount}</b> • Zonk: <b>${zonkCount}</b>`
+        : `😵 <b>Hasil Lucky Spin x${spinCount}</b>\nSemua hasil zonk. Ringkasan dikirim sebagai file.`
+    ).catch((err) => console.warn('send spin summary failed:', err.message));
+  }
+
+  const balanceLine = totalBalanceReward > 0
+    ? `\n💰 Bonus saldo: <b>${formatRupiah(totalBalanceReward)}</b>${newBalance !== null ? `\nSaldo sekarang: <b>${formatRupiah(newBalance)}</b>` : ''}`
+    : '';
+
+  const text = anyWin
+    ? `🎉 <b>WIN!</b>\n\nSpin: <b>x${spinCount}</b>\nMenang: <b>${winCount}</b>\nZonk: <b>${zonkCount}</b>${balanceLine}\n\nHadiah text/file dikirim sebagai file ringkasan.`
+    : `😵 <b>ZONK!</b>\n\nSpin: <b>x${spinCount}</b>\nBelum beruntung. Kamu bisa coba tier yang lebih tinggi untuk peluang lebih besar.`;
 
   await sendMessage(
     tenant.bot_token,
     customer.telegram_user_id,
-    `🎉 <b>WIN!</b>\n\nHadiah: <b>${esc(prize.name)}</b>\nTier: <b>${esc(tier.label)}</b>\n\nCek file hadiah yang baru dikirim ya.`,
+    text,
     { reply_markup: inlineKeyboard([[{ text: '🎰 Spin Lagi', callback_data: 'spin' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]) }
   ).catch(() => {});
 
-  return { ok: true, result: 'win', prize };
+  return { ok: true, result: anyWin ? 'win' : 'zonk', results, total_balance_reward: totalBalanceReward };
 }

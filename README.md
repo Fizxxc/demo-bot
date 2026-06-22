@@ -452,7 +452,9 @@ Versi ini menambahkan fitur bot Telegram:
   - Rp3.000: peluang sedang.
   - Rp5.000: peluang terbesar.
 - Lucky Spin bisa dibayar via saldo atau QRIS langsung.
+- User bisa pilih spin sekaligus: x1, x3, x5, x10, atau x20.
 - Owner bisa menambah stock hadiah spin dari Telegram Admin Panel → Stock Spin.
+- Hadiah spin bisa berupa akun/voucher text atau bonus saldo sampai Rp100.000.
 
 Jalankan migration tambahan sebelum deploy fitur ini:
 
@@ -460,13 +462,17 @@ Jalankan migration tambahan sebelum deploy fitur ini:
 -- Supabase SQL Editor
 -- jalankan file ini:
 supabase/migrations_bot_qris_spin.sql
+
+-- kalau fitur spin lama sudah pernah dipasang, jalankan juga patch ini:
+supabase/migrations_spin_batch_balance_rewards.sql
 ```
 
 Format tambah stock Lucky Spin via Telegram owner:
 
 ```txt
 Canva 1 Bulan | 5000 | email: akun@mail.com pass: rahasia | Hadiah utama
-Voucher kecil | 1000 | Kode: ABC123 | Hadiah ringan
+Saldo 100K | 5000 | SALDO:100000 | Bonus saldo utama
+Saldo 10K | 1000 | SALDO:10000 | Bonus saldo ringan
 ```
 
-Catatan: `tier_min` menentukan tier minimal hadiah bisa keluar. Hadiah `1000` bisa keluar di semua tier, hadiah `5000` hanya bisa keluar di spin 5K.
+Catatan: `tier_min` menentukan tier minimal hadiah bisa keluar. Hadiah `1000` bisa keluar di semua tier, hadiah `5000` hanya bisa keluar di spin 5K. Untuk hadiah saldo, isi reward dengan format `SALDO:nominal`, maksimal `SALDO:100000`.

@@ -164,7 +164,8 @@ async function handleDirectOrderInvoice(db, invoice, payload) {
 }
 
 async function handleSpinOrder(db, spinOrder, payload) {
-  if (Number(payload.amount) !== Number(spinOrder.tier_amount)) return json({ ok: false, error: 'amount_mismatch' }, 400);
+  const spinAmount = Number(spinOrder.total_payment || spinOrder.tier_amount);
+  if (Number(payload.amount) !== spinAmount) return json({ ok: false, error: 'amount_mismatch' }, 400);
   if (payload.status !== 'completed') {
     await db.from('spin_orders').update({ raw: { ...(spinOrder.raw || {}), last_webhook: payload }, updated_at: new Date().toISOString() }).eq('id', spinOrder.id);
     return json({ ok: true, ignored: true, status: payload.status });
@@ -176,7 +177,7 @@ async function handleSpinOrder(db, spinOrder, payload) {
   const pakasirConfig = getPakasirConfig(tenant);
   if (payload.project && pakasirConfig.project && payload.project !== pakasirConfig.project) return json({ ok: false, error: 'project_mismatch' }, 400);
 
-  const detail = await getTenantDetailOrTrust(tenant, payload, spinOrder.order_id, spinOrder.tier_amount);
+  const detail = await getTenantDetailOrTrust(tenant, payload, spinOrder.order_id, spinAmount);
   if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
 
   const result = await resolveSpinOrder({ db, tenant, customer, spinOrder, detail: { webhook: payload, detail } });

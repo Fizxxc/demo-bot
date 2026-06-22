@@ -103,13 +103,28 @@ function spinTierKeyboard() {
   ]);
 }
 
-function spinPayKeyboard(amount) {
+function spinQuantityKeyboard(amount) {
   return inlineKeyboard([
     [
-      { text: '💰 Bayar Saldo', callback_data: `spin:saldo:${amount}` },
-      { text: '💳 Bayar QRIS', callback_data: `spin:qris:${amount}` }
+      { text: 'x1', callback_data: `spin:qty:${amount}:1` },
+      { text: 'x3', callback_data: `spin:qty:${amount}:3` },
+      { text: 'x5', callback_data: `spin:qty:${amount}:5` }
+    ],
+    [
+      { text: 'x10', callback_data: `spin:qty:${amount}:10` },
+      { text: 'x20', callback_data: `spin:qty:${amount}:20` }
     ],
     [{ text: '🔙 Pilih Tier', callback_data: 'spin' }]
+  ]);
+}
+
+function spinPayKeyboard(amount, count = 1) {
+  return inlineKeyboard([
+    [
+      { text: '💰 Bayar Saldo', callback_data: `spin:saldo:${amount}:${count}` },
+      { text: '💳 Bayar QRIS', callback_data: `spin:qris:${amount}:${count}` }
+    ],
+    [{ text: '🔙 Ubah Jumlah Spin', callback_data: `spin:tier:${amount}` }]
   ]);
 }
 
@@ -692,74 +707,97 @@ async function showSpin(tenant, query) {
     'Pilih tier spin. Makin tinggi tier, makin besar peluang menang. Kalau tidak menang, hasilnya <b>ZONK</b>.\n\n' +
     SPIN_TIERS.map((tier) => `• <b>${formatRupiah(tier.amount)}</b> — peluang ±<b>${tier.chance}%</b> — ${esc(tier.desc)}`).join('\n') +
     `\n\n🎁 Stok hadiah tersedia: <b>${count || 0}</b>\n` +
-    'Setelah menang, hadiah langsung dikirim ke chat sebagai file.';
+    'Hadiah bisa berupa akun/voucher atau bonus saldo sampai <b>Rp100.000</b>. Setelah menang, hadiah langsung dikirim ke chat.';
 
   return editOrSend(tenant, query, text, spinTierKeyboard());
 }
 
-async function showSpinPaymentOptions(tenant, query, amount) {
+async function showSpinQuantityOptions(tenant, query, amount) {
   const tier = spinTierInfo(amount);
   if (!tier) return showSpin(tenant, query);
+
+  const text =
+    `🎰 <b>${esc(tier.label)}</b>\n\n` +
+    `Harga per spin: <b>${formatRupiah(tier.amount)}</b>\n` +
+    `Peluang menang per spin: ±<b>${tier.chance}%</b>\n\n` +
+    'Pilih mau spin berapa kali sekaligus. Contoh: pilih <b>x5</b> untuk spin 5 kali dalam satu pembayaran.';
+
+  return editOrSend(tenant, query, text, spinQuantityKeyboard(tier.amount));
+}
+
+async function showSpinPaymentOptions(tenant, query, amount, count = 1) {
+  const tier = spinTierInfo(amount);
+  if (!tier) return showSpin(tenant, query);
+  const spinCount = Math.max(1, Math.min(20, Number(count || 1)));
+  const total = tier.amount * spinCount;
   const balance = await getBalance((await ensureCustomer(tenant, query.from)).id);
   const text =
     `🎰 <b>${esc(tier.label)}</b>\n\n` +
-    `Harga: <b>${formatRupiah(tier.amount)}</b>\n` +
-    `Peluang menang: ±<b>${tier.chance}%</b>\n` +
+    `Jumlah spin: <b>x${spinCount}</b>\n` +
+    `Harga per spin: <b>${formatRupiah(tier.amount)}</b>\n` +
+    `Total bayar: <b>${formatRupiah(total)}</b>\n` +
+    `Peluang menang per spin: ±<b>${tier.chance}%</b>\n` +
     `Saldo kamu: <b>${formatRupiah(balance)}</b>\n\n` +
-    'Pilih metode pembayaran. Bisa pakai saldo atau bayar QRIS langsung.';
-  return editOrSend(tenant, query, text, spinPayKeyboard(tier.amount));
+    'Pilih metode pembayaran. Semua hasil spin akan langsung dikirim setelah selesai.';
+  return editOrSend(tenant, query, text, spinPayKeyboard(tier.amount, spinCount));
 }
 
-async function spinPaySaldo(tenant, query, customer, amount) {
+async function spinPaySaldo(tenant, query, customer, amount, count = 1) {
   const tier = spinTierInfo(amount);
   if (!tier) return showSpin(tenant, query);
+  const spinCount = Math.max(1, Math.min(20, Number(count || 1)));
+  const total = tier.amount * spinCount;
   const db = supabaseAdmin();
   const { data: balanceRow, error: balanceError } = await db.from('balances').select('amount').eq('customer_id', customer.id).maybeSingle();
   if (balanceError) throw balanceError;
   const balance = Number(balanceRow?.amount || 0);
-  if (balance < tier.amount) {
-    return editOrSend(tenant, query, `❌ Saldo tidak cukup. Butuh <b>${formatRupiah(tier.amount)}</b>, saldo kamu <b>${formatRupiah(balance)}</b>.`, inlineKeyboard([[{ text: '💳 Bayar QRIS Langsung', callback_data: `spin:qris:${tier.amount}` }], [{ text: '💰 Deposit Saldo', callback_data: 'deposit' }], [{ text: '🎰 Pilih Spin', callback_data: 'spin' }]]));
+  if (balance < total) {
+    return editOrSend(tenant, query, `❌ Saldo tidak cukup. Butuh <b>${formatRupiah(total)}</b> untuk x${spinCount}, saldo kamu <b>${formatRupiah(balance)}</b>.`, inlineKeyboard([[{ text: '💳 Bayar QRIS Langsung', callback_data: `spin:qris:${tier.amount}:${spinCount}` }], [{ text: '💰 Deposit Saldo', callback_data: 'deposit' }], [{ text: '🎰 Pilih Spin', callback_data: 'spin' }]]));
   }
 
   const orderId = spinOrderId(tenant.id);
-  await db.from('balances').update({ amount: balance - tier.amount, updated_at: new Date().toISOString() }).eq('customer_id', customer.id);
+  await db.from('balances').update({ amount: balance - total, updated_at: new Date().toISOString() }).eq('customer_id', customer.id);
   const { data: spinOrder, error } = await db.from('spin_orders').insert({
     tenant_id: tenant.id,
     customer_id: customer.id,
     order_id: orderId,
     tier_amount: tier.amount,
+    spin_count: spinCount,
     pay_method: 'saldo',
     status: 'paid',
-    total_payment: tier.amount,
-    raw: { paid_with_balance: true, previous_balance: balance, next_balance: balance - tier.amount }
+    total_payment: total,
+    raw: { paid_with_balance: true, spin_count: spinCount, previous_balance: balance, next_balance: balance - total }
   }).select('*').single();
   if (error) throw error;
 
-  await editOrSend(tenant, query, `✅ Saldo terpotong <b>${formatRupiah(tier.amount)}</b>. Memulai spin...`, undefined);
+  await editOrSend(tenant, query, `✅ Saldo terpotong <b>${formatRupiah(total)}</b> untuk spin x${spinCount}. Memulai spin...`, undefined);
   return resolveSpinOrder({ db, tenant, customer, spinOrder });
 }
 
-async function spinPayQris(tenant, query, customer, amount) {
+async function spinPayQris(tenant, query, customer, amount, count = 1) {
   const tier = spinTierInfo(amount);
   if (!tier) return showSpin(tenant, query);
+  const spinCount = Math.max(1, Math.min(20, Number(count || 1)));
+  const total = tier.amount * spinCount;
   const config = getPakasirConfig(tenant);
-  if (!config.project || !config.apiKey) return editOrSend(tenant, query, '⚠️ QRIS belum aktif. Owner perlu mengisi Pakasir project slug dan API key.', spinPayKeyboard(tier.amount));
+  if (!config.project || !config.apiKey) return editOrSend(tenant, query, '⚠️ QRIS belum aktif. Owner perlu mengisi Pakasir project slug dan API key.', spinPayKeyboard(tier.amount, spinCount));
 
-  await editOrSend(tenant, query, `⏳ Membuat QRIS untuk <b>${esc(tier.label)}</b>...`, undefined);
+  await editOrSend(tenant, query, `⏳ Membuat QRIS untuk <b>${esc(tier.label)}</b> x${spinCount}...`, undefined);
   const orderId = spinOrderId(tenant.id);
-  const payment = await createQrisTransaction(tenant, { orderId, amount: tier.amount });
+  const payment = await createQrisTransaction(tenant, { orderId, amount: total });
   const qrImage = await generateQrisImage(payment.payment_number);
   const { data: spinOrder, error } = await supabaseAdmin().from('spin_orders').insert({
     tenant_id: tenant.id,
     customer_id: customer.id,
     order_id: orderId,
     tier_amount: tier.amount,
+    spin_count: spinCount,
     pay_method: 'qris',
     status: 'pending',
     fee: Number(payment.fee || 0),
-    total_payment: Number(payment.total_payment || tier.amount),
+    total_payment: Number(payment.total_payment || total),
     payment_number: payment.payment_number || null,
-    raw: payment
+    raw: { ...payment, spin_count: spinCount }
   }).select('*').single();
   if (error) throw error;
 
@@ -767,7 +805,8 @@ async function spinPayQris(tenant, query, customer, amount) {
     '💳 <b>Invoice Lucky Spin QRIS</b>\n\n' +
     `🧾 Order ID: <code>${esc(orderId)}</code>\n` +
     `🎰 Tier: <b>${esc(tier.label)}</b>\n` +
-    `🎯 Peluang: ±<b>${tier.chance}%</b>\n` +
+    `🔁 Jumlah: <b>x${spinCount}</b>\n` +
+    `🎯 Peluang: ±<b>${tier.chance}%</b> per spin\n` +
     `🏦 Total Bayar: <b>${formatRupiah(spinOrder.total_payment)}</b>\n\n` +
     'Scan QRIS ini. Setelah bayar, tekan <b>Cek Pembayaran</b> dan spin akan langsung dimulai.';
 
@@ -787,7 +826,7 @@ async function checkSpinPayment(tenant, query, spinOrderDbId) {
     return;
   }
 
-  const detail = await getTransactionDetail(tenant, { orderId: spinOrder.order_id, amount: spinOrder.tier_amount });
+  const detail = await getTransactionDetail(tenant, { orderId: spinOrder.order_id, amount: Number(spinOrder.total_payment || spinOrder.tier_amount) });
   if (detail?.status !== 'completed') return answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran belum masuk. Coba lagi sebentar ya.', { show_alert: true });
 
   await answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran berhasil. Spin dimulai! 🎰', { show_alert: true });
@@ -800,7 +839,7 @@ async function cancelSpinPayment(tenant, query, spinOrderDbId) {
   if (error) throw error;
   if (!spinOrder) return;
   if (spinOrder.status !== 'pending') return answerCallbackQuery(tenant.bot_token, query.id, 'Spin tidak bisa dibatalkan.', { show_alert: true });
-  try { await cancelTransaction(tenant, { orderId: spinOrder.order_id, amount: spinOrder.tier_amount }); } catch (err) { console.warn('Cancel spin warning:', err.message); }
+  try { await cancelTransaction(tenant, { orderId: spinOrder.order_id, amount: Number(spinOrder.total_payment || spinOrder.tier_amount) }); } catch (err) { console.warn('Cancel spin warning:', err.message); }
   await db.from('spin_orders').update({ status: 'canceled', updated_at: new Date().toISOString() }).eq('id', spinOrder.id);
   return editOrSend(tenant, query, '✅ Invoice Lucky Spin dibatalkan.', inlineKeyboard([[{ text: '🎰 Pilih Spin', callback_data: 'spin' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]));
 }
@@ -1129,11 +1168,12 @@ async function startAddSpinStock(tenant, query) {
   const text =
     '🎰 <b>ADD STOCK LUCKY SPIN</b>\n\n' +
     'Kirim hadiah spin dengan format per baris:\n' +
-    '<code>NAMA HADIAH | TIER_MIN | REWARD_TEXT | CATATAN</code>\n\n' +
+    '<code>NAMA HADIAH | TIER_MIN | REWARD_TEXT / SALDO:nominal | CATATAN</code>\n\n' +
     'Tier min hanya boleh: <b>1000</b>, <b>2000</b>, <b>3000</b>, atau <b>5000</b>.\n' +
     'Hadiah dengan tier_min 5000 hanya bisa keluar di spin 5K. Hadiah 1000 bisa keluar di semua tier.\n\n' +
     'Contoh:\n' +
-    '<code>Canva 1 Bulan | 5000 | email: akun@mail.com pass: rahasia | Hadiah utama\nVoucher kecil | 1000 | Kode: ABC123 | Hadiah ringan</code>\n\n' +
+    '<code>Canva 1 Bulan | 5000 | email: akun@mail.com pass: rahasia | Hadiah utama\nSaldo 100K | 5000 | SALDO:100000 | Bonus saldo utama\nSaldo 10K | 1000 | SALDO:10000 | Bonus saldo ringan</code>\n\n' +
+    'Untuk hadiah saldo, gunakan <code>SALDO:nominal</code>. Maksimal saldo reward Rp100.000.\n\n' +
     'Ketik <code>/cancel</code> untuk batal.';
 
   return editOrSend(tenant, query, text, adminBackKeyboard());
@@ -1151,11 +1191,23 @@ async function handleAdminAddSpinStockText(tenant, from, chatId, text) {
     const [name, tierRaw, rewardText, note = ''] = parts;
     const tierMin = parseNominal(tierRaw);
     if (!tierMin || !allowedTiers.has(Number(tierMin))) { rejected.push(line); continue; }
+    const saldoMatch = String(rewardText).match(/^SALDO\s*[:=]\s*(.+)$/i);
+    let rewardType = 'text';
+    let balanceAmount = 0;
+    let finalRewardText = rewardText;
+    if (saldoMatch) {
+      rewardType = 'balance';
+      balanceAmount = parseNominal(saldoMatch[1]);
+      if (!balanceAmount || balanceAmount < 1000 || balanceAmount > 100000) { rejected.push(line); continue; }
+      finalRewardText = `Bonus saldo ${formatRupiah(balanceAmount)}`;
+    }
     prizes.push({
       tenant_id: tenant.id,
       name,
       tier_min: Number(tierMin),
-      reward_text: rewardText,
+      reward_text: finalRewardText,
+      reward_type: rewardType,
+      balance_amount: balanceAmount,
       note,
       status: 'available'
     });
@@ -1541,15 +1593,22 @@ async function handleCallback(tenant, update) {
   }
 
   if (data.startsWith('spin:tier:')) {
-    return showSpinPaymentOptions(tenant, query, Number(data.split(':')[2]));
+    return showSpinQuantityOptions(tenant, query, Number(data.split(':')[2]));
+  }
+
+  if (data.startsWith('spin:qty:')) {
+    const [, , amount, count] = data.split(':');
+    return showSpinPaymentOptions(tenant, query, Number(amount), Number(count));
   }
 
   if (data.startsWith('spin:saldo:')) {
-    return spinPaySaldo(tenant, query, customer, Number(data.split(':')[2]));
+    const [, , amount, count = '1'] = data.split(':');
+    return spinPaySaldo(tenant, query, customer, Number(amount), Number(count));
   }
 
   if (data.startsWith('spin:qris:')) {
-    return spinPayQris(tenant, query, customer, Number(data.split(':')[2]));
+    const [, , amount, count = '1'] = data.split(':');
+    return spinPayQris(tenant, query, customer, Number(amount), Number(count));
   }
 
   if (data.startsWith('spinpaycheck:')) {

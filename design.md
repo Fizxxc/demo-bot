@@ -59,3 +59,11 @@ Mapping:
 - Saat membeli produk, tampilkan pilihan `Bayar Saldo` dan `Bayar QRIS`.
 - Lucky Spin harus memakai animasi teks bertahap sebelum hasil dikirim.
 - Hasil lucky spin langsung dikirim ke chat; hadiah dikirim sebagai file `.txt`.
+
+## Lucky Spin Batch Flow
+
+1. User pilih tier spin.
+2. User pilih jumlah spin sekaligus.
+3. User pilih bayar saldo atau QRIS.
+4. Bot menampilkan animasi spin.
+5. Bot mengirim ringkasan hasil dan hadiah langsung.
