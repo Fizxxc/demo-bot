@@ -6,6 +6,7 @@ import { formatRupiah } from '../../../../lib/money.js';
 import { getPlan } from '../../../../lib/plans.js';
 import { inlineKeyboard, sendMessage } from '../../../../lib/telegram.js';
 import { ownerNotify } from '../../../../lib/satsko.js';
+import { fulfillDirectOrderInvoice, resolveSpinOrder } from '../../../../lib/botFulfillment.js';
 
 export const runtime = 'nodejs';
 
@@ -121,6 +122,67 @@ async function handleMerchantDeposit(db, dep, payload) {
   return json({ ok: true, type: 'merchant_deposit', new_balance: newBalance });
 }
 
+async function loadTenantAndCustomer(db, tenantId, customerId) {
+  const [{ data: tenant, error: tenantError }, { data: customer, error: customerError }] = await Promise.all([
+    db.from('tenants').select('*').eq('id', tenantId).maybeSingle(),
+    db.from('customers').select('*').eq('id', customerId).maybeSingle()
+  ]);
+  if (tenantError) throw tenantError;
+  if (customerError) throw customerError;
+  return { tenant, customer };
+}
+
+async function getTenantDetailOrTrust(tenant, payload, orderId, amount) {
+  let detail;
+  try {
+    detail = await getTransactionDetail(tenant, { orderId, amount });
+  } catch (err) {
+    if (payload.is_sandbox || process.env.PAKASIR_TRUST_WEBHOOK === 'true') detail = payload;
+    else throw err;
+  }
+  return detail;
+}
+
+async function handleDirectOrderInvoice(db, invoice, payload) {
+  if (Number(payload.amount) !== Number(invoice.amount)) return json({ ok: false, error: 'amount_mismatch' }, 400);
+  if (payload.status !== 'completed') {
+    await db.from('direct_order_invoices').update({ raw: { ...(invoice.raw || {}), last_webhook: payload }, updated_at: new Date().toISOString() }).eq('id', invoice.id);
+    return json({ ok: true, ignored: true, status: payload.status });
+  }
+  const { tenant, customer } = await loadTenantAndCustomer(db, invoice.tenant_id, invoice.customer_id);
+  if (!tenant) return json({ ok: false, error: 'tenant_not_found' }, 404);
+  if (!customer) return json({ ok: false, error: 'customer_not_found' }, 404);
+
+  const pakasirConfig = getPakasirConfig(tenant);
+  if (payload.project && pakasirConfig.project && payload.project !== pakasirConfig.project) return json({ ok: false, error: 'project_mismatch' }, 400);
+
+  const detail = await getTenantDetailOrTrust(tenant, payload, invoice.order_id, invoice.amount);
+  if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
+
+  const result = await fulfillDirectOrderInvoice({ db, tenant, customer, invoice, detail: { webhook: payload, detail } });
+  return json({ ok: true, type: 'direct_order_invoice', invoice: invoice.order_id, result });
+}
+
+async function handleSpinOrder(db, spinOrder, payload) {
+  if (Number(payload.amount) !== Number(spinOrder.tier_amount)) return json({ ok: false, error: 'amount_mismatch' }, 400);
+  if (payload.status !== 'completed') {
+    await db.from('spin_orders').update({ raw: { ...(spinOrder.raw || {}), last_webhook: payload }, updated_at: new Date().toISOString() }).eq('id', spinOrder.id);
+    return json({ ok: true, ignored: true, status: payload.status });
+  }
+  const { tenant, customer } = await loadTenantAndCustomer(db, spinOrder.tenant_id, spinOrder.customer_id);
+  if (!tenant) return json({ ok: false, error: 'tenant_not_found' }, 404);
+  if (!customer) return json({ ok: false, error: 'customer_not_found' }, 404);
+
+  const pakasirConfig = getPakasirConfig(tenant);
+  if (payload.project && pakasirConfig.project && payload.project !== pakasirConfig.project) return json({ ok: false, error: 'project_mismatch' }, 400);
+
+  const detail = await getTenantDetailOrTrust(tenant, payload, spinOrder.order_id, spinOrder.tier_amount);
+  if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
+
+  const result = await resolveSpinOrder({ db, tenant, customer, spinOrder, detail: { webhook: payload, detail } });
+  return json({ ok: true, type: 'spin_order', order_id: spinOrder.order_id, result });
+}
+
 export async function POST(req) {
   try {
     const payload = await readJson(req);
@@ -147,6 +209,20 @@ export async function POST(req) {
     if (dep) {
       await logWebhook(db, payload, { matchedTable: 'merchant_deposits', matchedId: dep.id, responseBody: { matched: true, table: 'merchant_deposits' } });
       return handleMerchantDeposit(db, dep, payload);
+    }
+
+    const { data: directInvoice, error: directError } = await db.from('direct_order_invoices').select('*').eq('order_id', orderId).maybeSingle();
+    if (directError) throw directError;
+    if (directInvoice) {
+      await logWebhook(db, payload, { matchedTable: 'direct_order_invoices', matchedId: directInvoice.id, responseBody: { matched: true, table: 'direct_order_invoices' } });
+      return handleDirectOrderInvoice(db, directInvoice, payload);
+    }
+
+    const { data: spinOrder, error: spinError } = await db.from('spin_orders').select('*').eq('order_id', orderId).maybeSingle();
+    if (spinError) throw spinError;
+    if (spinOrder) {
+      await logWebhook(db, payload, { matchedTable: 'spin_orders', matchedId: spinOrder.id, responseBody: { matched: true, table: 'spin_orders' } });
+      return handleSpinOrder(db, spinOrder, payload);
     }
 
     const responseBody = {

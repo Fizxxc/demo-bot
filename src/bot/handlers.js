@@ -12,6 +12,7 @@ import {
 } from '../lib/telegram.js';
 import { cancelTransaction, createQrisTransaction, getPakasirConfig, getTransactionDetail } from '../lib/pakasir.js';
 import { generateQrisImage } from '../lib/qrisImage.js';
+import { fulfillDirectOrderInvoice, resolveSpinOrder, SPIN_TIERS, spinTierInfo } from '../lib/botFulfillment.js';
 
 const DEPOSIT_PRESETS = [10000, 25000, 50000, 100000];
 
@@ -20,6 +21,20 @@ function randomOrderId(tenantId) {
   const shard = String(tenantId).replace(/-/g, '').slice(0, 6).toUpperCase();
   const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
   return `DEP${date}${shard}${rand}`;
+}
+
+function directOrderId(tenantId) {
+  const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const shard = String(tenantId).replace(/-/g, '').slice(0, 6).toUpperCase();
+  const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `ORD${date}${shard}${rand}`;
+}
+
+function spinOrderId(tenantId) {
+  const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const shard = String(tenantId).replace(/-/g, '').slice(0, 6).toUpperCase();
+  const rand = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `SPN${date}${shard}${rand}`;
 }
 
 function mainKeyboard(isOwner = false) {
@@ -32,7 +47,10 @@ function mainKeyboard(isOwner = false) {
       { text: '💰 Deposit QRIS', callback_data: 'deposit' },
       { text: '📜 Riwayat', callback_data: 'history' }
     ],
-    [{ text: 'ℹ️ Info Bot', callback_data: 'info' }]
+    [
+      { text: '🎰 Lucky Spin', callback_data: 'spin' },
+      { text: 'ℹ️ Info Bot', callback_data: 'info' }
+    ]
   ];
 
   if (isOwner) rows.push([{ text: '👑 Admin Panel', callback_data: 'admin' }]);
@@ -46,7 +64,10 @@ function productQtyKeyboard(qty) {
       { text: `Jumlah: ${qty}`, callback_data: 'noop' },
       { text: '➕', callback_data: 'qty:+' }
     ],
-    [{ text: '✅ Konfirmasi Order', callback_data: 'buy:confirm' }],
+    [
+      { text: '💰 Bayar Saldo', callback_data: 'buy:saldo' },
+      { text: '💳 Bayar QRIS', callback_data: 'buy:qris' }
+    ],
     [{ text: '🔙 Kembali', callback_data: 'products' }]
   ]);
 }
@@ -63,6 +84,39 @@ function invoiceKeyboard(invoiceId) {
   return inlineKeyboard([
     [{ text: '🔁 Cek Pembayaran', callback_data: `paycheck:${invoiceId}` }],
     [{ text: '❌ Batalkan Invoice', callback_data: `paycancel:${invoiceId}` }],
+    [{ text: '🏠 Menu Utama', callback_data: 'menu' }]
+  ]);
+}
+
+function directInvoiceKeyboard(invoiceId) {
+  return inlineKeyboard([
+    [{ text: '🔁 Cek Pembayaran', callback_data: `directpaycheck:${invoiceId}` }],
+    [{ text: '❌ Batalkan Invoice', callback_data: `directpaycancel:${invoiceId}` }],
+    [{ text: '🏠 Menu Utama', callback_data: 'menu' }]
+  ]);
+}
+
+function spinTierKeyboard() {
+  return inlineKeyboard([
+    ...SPIN_TIERS.map((tier) => ([{ text: `${formatRupiah(tier.amount)} • ${tier.chance}% chance`, callback_data: `spin:tier:${tier.amount}` }])),
+    [{ text: '🏠 Menu Utama', callback_data: 'menu' }]
+  ]);
+}
+
+function spinPayKeyboard(amount) {
+  return inlineKeyboard([
+    [
+      { text: '💰 Bayar Saldo', callback_data: `spin:saldo:${amount}` },
+      { text: '💳 Bayar QRIS', callback_data: `spin:qris:${amount}` }
+    ],
+    [{ text: '🔙 Pilih Tier', callback_data: 'spin' }]
+  ]);
+}
+
+function spinInvoiceKeyboard(spinOrderIdValue) {
+  return inlineKeyboard([
+    [{ text: '🔁 Cek Pembayaran', callback_data: `spinpaycheck:${spinOrderIdValue}` }],
+    [{ text: '❌ Batalkan Spin', callback_data: `spincancel:${spinOrderIdValue}` }],
     [{ text: '🏠 Menu Utama', callback_data: 'menu' }]
   ]);
 }
@@ -531,6 +585,226 @@ async function cancelPayment(tenant, query, invoiceId) {
   return editOrSend(tenant, query, '✅ Invoice deposit sudah dibatalkan.', inlineKeyboard([[{ text: '🏠 Menu Utama', callback_data: 'menu' }]]));
 }
 
+async function createDirectProductPayment(tenant, query, customer) {
+  const session = await getSession(tenant, query.from.id);
+  const productId = session?.data?.productId;
+  const qty = Number(session?.data?.qty || 1);
+
+  if (!productId) {
+    return editOrSend(tenant, query, '❌ Data pesanan tidak ditemukan. Pilih produk ulang.', inlineKeyboard([[{ text: '🛍️ List Produk', callback_data: 'products' }]]));
+  }
+
+  const db = supabaseAdmin();
+  const { data: product, error } = await db
+    .from('product_stock')
+    .select('*')
+    .eq('tenant_id', tenant.id)
+    .eq('id', productId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!product || !product.is_active) return editOrSend(tenant, query, '❌ Produk tidak ditemukan.', inlineKeyboard([[{ text: '🛍️ List Produk', callback_data: 'products' }]]));
+  if (Number(product.stock || 0) < qty) return editOrSend(tenant, query, '❌ Stok tidak cukup untuk jumlah ini.', inlineKeyboard([[{ text: '🛍️ List Produk', callback_data: 'products' }]]));
+
+  const total = Number(product.price) * qty;
+  const config = getPakasirConfig(tenant);
+  if (!config.project || !config.apiKey) {
+    return editOrSend(tenant, query, '⚠️ QRIS belum aktif. Owner perlu mengisi Pakasir project slug dan API key.', inlineKeyboard([[{ text: '💰 Bayar Saldo', callback_data: 'buy:saldo' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]));
+  }
+
+  await editOrSend(tenant, query, `⏳ Membuat invoice QRIS untuk <b>${esc(product.name)}</b> x${qty}...`, undefined);
+  const orderId = directOrderId(tenant.id);
+  const payment = await createQrisTransaction(tenant, { orderId, amount: total });
+  const qrImage = await generateQrisImage(payment.payment_number);
+
+  const { data: invoice, error: invoiceError } = await db
+    .from('direct_order_invoices')
+    .insert({
+      tenant_id: tenant.id,
+      customer_id: customer.id,
+      product_id: product.id,
+      qty,
+      order_id: orderId,
+      amount: total,
+      fee: Number(payment.fee || 0),
+      total_payment: Number(payment.total_payment || total),
+      payment_number: payment.payment_number || null,
+      status: 'pending',
+      raw: payment
+    })
+    .select('*')
+    .single();
+  if (invoiceError) throw invoiceError;
+
+  await clearSession(tenant, query.from.id);
+
+  const caption =
+    '💳 <b>Invoice Order QRIS</b>\n\n' +
+    `🧾 Order ID: <code>${esc(orderId)}</code>\n` +
+    `📦 Produk: <b>${esc(product.name)}</b> x${qty}\n` +
+    `💰 Total Produk: <b>${formatRupiah(total)}</b>\n` +
+    `🏦 Total Bayar: <b>${formatRupiah(invoice.total_payment)}</b>\n\n` +
+    'Scan QRIS ini. Setelah bayar, tekan <b>Cek Pembayaran</b>. Produk akan langsung dikirim tanpa perlu deposit saldo dulu.';
+
+  await sendPhotoBuffer(tenant.bot_token, query.from.id, qrImage, caption, { reply_markup: directInvoiceKeyboard(invoice.id) });
+}
+
+async function checkDirectOrderPayment(tenant, query, invoiceId) {
+  const db = supabaseAdmin();
+  const { data: invoice, error } = await db.from('direct_order_invoices').select('*').eq('id', invoiceId).eq('tenant_id', tenant.id).maybeSingle();
+  if (error) throw error;
+  if (!invoice) return answerCallbackQuery(tenant.bot_token, query.id, 'Invoice order tidak ditemukan.', { show_alert: true });
+  const { data: customer } = await db.from('customers').select('*').eq('id', invoice.customer_id).maybeSingle();
+  if (!customer) return answerCallbackQuery(tenant.bot_token, query.id, 'Customer tidak ditemukan.', { show_alert: true });
+
+  if (invoice.status === 'paid') {
+    await answerCallbackQuery(tenant.bot_token, query.id, 'Invoice sudah dibayar ✅', { show_alert: true });
+    return fulfillDirectOrderInvoice({ db, tenant, customer, invoice, detail: invoice.raw || {} });
+  }
+
+  const detail = await getTransactionDetail(tenant, { orderId: invoice.order_id, amount: invoice.amount });
+  if (detail?.status !== 'completed') return answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran belum masuk. Coba lagi sebentar ya.', { show_alert: true });
+
+  await answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran berhasil ✅', { show_alert: true });
+  return fulfillDirectOrderInvoice({ db, tenant, customer, invoice, detail });
+}
+
+async function cancelDirectOrderPayment(tenant, query, invoiceId) {
+  const db = supabaseAdmin();
+  const { data: invoice, error } = await db.from('direct_order_invoices').select('*').eq('id', invoiceId).eq('tenant_id', tenant.id).maybeSingle();
+  if (error) throw error;
+  if (!invoice) return;
+  if (invoice.status !== 'pending') return answerCallbackQuery(tenant.bot_token, query.id, 'Invoice order tidak bisa dibatalkan.', { show_alert: true });
+  try { await cancelTransaction(tenant, { orderId: invoice.order_id, amount: invoice.amount }); } catch (err) { console.warn('Cancel direct order warning:', err.message); }
+  await db.from('direct_order_invoices').update({ status: 'canceled', updated_at: new Date().toISOString() }).eq('id', invoice.id);
+  return editOrSend(tenant, query, '✅ Invoice order QRIS sudah dibatalkan.', inlineKeyboard([[{ text: '🛍️ List Produk', callback_data: 'products' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]));
+}
+
+async function showSpin(tenant, query) {
+  await clearSession(tenant, query.from.id);
+  const { count } = await supabaseAdmin()
+    .from('spin_prizes')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenant.id)
+    .eq('status', 'available');
+
+  const text =
+    '🎰 <b>LUCKY SPIN</b>\n\n' +
+    'Pilih tier spin. Makin tinggi tier, makin besar peluang menang. Kalau tidak menang, hasilnya <b>ZONK</b>.\n\n' +
+    SPIN_TIERS.map((tier) => `• <b>${formatRupiah(tier.amount)}</b> — peluang ±<b>${tier.chance}%</b> — ${esc(tier.desc)}`).join('\n') +
+    `\n\n🎁 Stok hadiah tersedia: <b>${count || 0}</b>\n` +
+    'Setelah menang, hadiah langsung dikirim ke chat sebagai file.';
+
+  return editOrSend(tenant, query, text, spinTierKeyboard());
+}
+
+async function showSpinPaymentOptions(tenant, query, amount) {
+  const tier = spinTierInfo(amount);
+  if (!tier) return showSpin(tenant, query);
+  const balance = await getBalance((await ensureCustomer(tenant, query.from)).id);
+  const text =
+    `🎰 <b>${esc(tier.label)}</b>\n\n` +
+    `Harga: <b>${formatRupiah(tier.amount)}</b>\n` +
+    `Peluang menang: ±<b>${tier.chance}%</b>\n` +
+    `Saldo kamu: <b>${formatRupiah(balance)}</b>\n\n` +
+    'Pilih metode pembayaran. Bisa pakai saldo atau bayar QRIS langsung.';
+  return editOrSend(tenant, query, text, spinPayKeyboard(tier.amount));
+}
+
+async function spinPaySaldo(tenant, query, customer, amount) {
+  const tier = spinTierInfo(amount);
+  if (!tier) return showSpin(tenant, query);
+  const db = supabaseAdmin();
+  const { data: balanceRow, error: balanceError } = await db.from('balances').select('amount').eq('customer_id', customer.id).maybeSingle();
+  if (balanceError) throw balanceError;
+  const balance = Number(balanceRow?.amount || 0);
+  if (balance < tier.amount) {
+    return editOrSend(tenant, query, `❌ Saldo tidak cukup. Butuh <b>${formatRupiah(tier.amount)}</b>, saldo kamu <b>${formatRupiah(balance)}</b>.`, inlineKeyboard([[{ text: '💳 Bayar QRIS Langsung', callback_data: `spin:qris:${tier.amount}` }], [{ text: '💰 Deposit Saldo', callback_data: 'deposit' }], [{ text: '🎰 Pilih Spin', callback_data: 'spin' }]]));
+  }
+
+  const orderId = spinOrderId(tenant.id);
+  await db.from('balances').update({ amount: balance - tier.amount, updated_at: new Date().toISOString() }).eq('customer_id', customer.id);
+  const { data: spinOrder, error } = await db.from('spin_orders').insert({
+    tenant_id: tenant.id,
+    customer_id: customer.id,
+    order_id: orderId,
+    tier_amount: tier.amount,
+    pay_method: 'saldo',
+    status: 'paid',
+    total_payment: tier.amount,
+    raw: { paid_with_balance: true, previous_balance: balance, next_balance: balance - tier.amount }
+  }).select('*').single();
+  if (error) throw error;
+
+  await editOrSend(tenant, query, `✅ Saldo terpotong <b>${formatRupiah(tier.amount)}</b>. Memulai spin...`, undefined);
+  return resolveSpinOrder({ db, tenant, customer, spinOrder });
+}
+
+async function spinPayQris(tenant, query, customer, amount) {
+  const tier = spinTierInfo(amount);
+  if (!tier) return showSpin(tenant, query);
+  const config = getPakasirConfig(tenant);
+  if (!config.project || !config.apiKey) return editOrSend(tenant, query, '⚠️ QRIS belum aktif. Owner perlu mengisi Pakasir project slug dan API key.', spinPayKeyboard(tier.amount));
+
+  await editOrSend(tenant, query, `⏳ Membuat QRIS untuk <b>${esc(tier.label)}</b>...`, undefined);
+  const orderId = spinOrderId(tenant.id);
+  const payment = await createQrisTransaction(tenant, { orderId, amount: tier.amount });
+  const qrImage = await generateQrisImage(payment.payment_number);
+  const { data: spinOrder, error } = await supabaseAdmin().from('spin_orders').insert({
+    tenant_id: tenant.id,
+    customer_id: customer.id,
+    order_id: orderId,
+    tier_amount: tier.amount,
+    pay_method: 'qris',
+    status: 'pending',
+    fee: Number(payment.fee || 0),
+    total_payment: Number(payment.total_payment || tier.amount),
+    payment_number: payment.payment_number || null,
+    raw: payment
+  }).select('*').single();
+  if (error) throw error;
+
+  const caption =
+    '💳 <b>Invoice Lucky Spin QRIS</b>\n\n' +
+    `🧾 Order ID: <code>${esc(orderId)}</code>\n` +
+    `🎰 Tier: <b>${esc(tier.label)}</b>\n` +
+    `🎯 Peluang: ±<b>${tier.chance}%</b>\n` +
+    `🏦 Total Bayar: <b>${formatRupiah(spinOrder.total_payment)}</b>\n\n` +
+    'Scan QRIS ini. Setelah bayar, tekan <b>Cek Pembayaran</b> dan spin akan langsung dimulai.';
+
+  await sendPhotoBuffer(tenant.bot_token, query.from.id, qrImage, caption, { reply_markup: spinInvoiceKeyboard(spinOrder.id) });
+}
+
+async function checkSpinPayment(tenant, query, spinOrderDbId) {
+  const db = supabaseAdmin();
+  const { data: spinOrder, error } = await db.from('spin_orders').select('*').eq('id', spinOrderDbId).eq('tenant_id', tenant.id).maybeSingle();
+  if (error) throw error;
+  if (!spinOrder) return answerCallbackQuery(tenant.bot_token, query.id, 'Spin order tidak ditemukan.', { show_alert: true });
+  const { data: customer } = await db.from('customers').select('*').eq('id', spinOrder.customer_id).maybeSingle();
+  if (!customer) return answerCallbackQuery(tenant.bot_token, query.id, 'Customer tidak ditemukan.', { show_alert: true });
+
+  if (spinOrder.status === 'paid' && spinOrder.result) {
+    await answerCallbackQuery(tenant.bot_token, query.id, 'Spin sudah diproses ✅', { show_alert: true });
+    return;
+  }
+
+  const detail = await getTransactionDetail(tenant, { orderId: spinOrder.order_id, amount: spinOrder.tier_amount });
+  if (detail?.status !== 'completed') return answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran belum masuk. Coba lagi sebentar ya.', { show_alert: true });
+
+  await answerCallbackQuery(tenant.bot_token, query.id, 'Pembayaran berhasil. Spin dimulai! 🎰', { show_alert: true });
+  return resolveSpinOrder({ db, tenant, customer, spinOrder, detail });
+}
+
+async function cancelSpinPayment(tenant, query, spinOrderDbId) {
+  const db = supabaseAdmin();
+  const { data: spinOrder, error } = await db.from('spin_orders').select('*').eq('id', spinOrderDbId).eq('tenant_id', tenant.id).maybeSingle();
+  if (error) throw error;
+  if (!spinOrder) return;
+  if (spinOrder.status !== 'pending') return answerCallbackQuery(tenant.bot_token, query.id, 'Spin tidak bisa dibatalkan.', { show_alert: true });
+  try { await cancelTransaction(tenant, { orderId: spinOrder.order_id, amount: spinOrder.tier_amount }); } catch (err) { console.warn('Cancel spin warning:', err.message); }
+  await db.from('spin_orders').update({ status: 'canceled', updated_at: new Date().toISOString() }).eq('id', spinOrder.id);
+  return editOrSend(tenant, query, '✅ Invoice Lucky Spin dibatalkan.', inlineKeyboard([[{ text: '🎰 Pilih Spin', callback_data: 'spin' }], [{ text: '🏠 Menu Utama', callback_data: 'menu' }]]));
+}
+
 async function history(tenant, query, customer) {
   const { data, error } = await supabaseAdmin()
     .from('transactions')
@@ -584,9 +858,10 @@ function adminKeyboard() {
       { text: '💵 Atur Saldo', callback_data: 'admin:balance' }
     ],
     [
-      { text: '🧾 Pending Invoice', callback_data: 'admin:pending' },
-      { text: '🏠 Menu Utama', callback_data: 'menu' }
-    ]
+      { text: '🎰 Stock Spin', callback_data: 'admin:spinstock' },
+      { text: '🧾 Pending Invoice', callback_data: 'admin:pending' }
+    ],
+    [{ text: '🏠 Menu Utama', callback_data: 'menu' }]
   ]);
 }
 
@@ -847,6 +1122,61 @@ async function handleAdminAddStockText(tenant, from, chatId, text, session) {
   return sendMessage(tenant.bot_token, chatId, textResult, { reply_markup: inlineKeyboard([[{ text: '📥 Tambah Stock Lagi', callback_data: `admin:addstock:${productId}` }], [{ text: '🧰 Detail Produk', callback_data: `admin:product:${productId}` }]]) });
 }
 
+async function startAddSpinStock(tenant, query) {
+  if (!ownerOnly(tenant, query.from)) return;
+  await setSession(tenant, query.from.id, 'ADMIN_ADD_SPIN_STOCK', {});
+
+  const text =
+    '🎰 <b>ADD STOCK LUCKY SPIN</b>\n\n' +
+    'Kirim hadiah spin dengan format per baris:\n' +
+    '<code>NAMA HADIAH | TIER_MIN | REWARD_TEXT | CATATAN</code>\n\n' +
+    'Tier min hanya boleh: <b>1000</b>, <b>2000</b>, <b>3000</b>, atau <b>5000</b>.\n' +
+    'Hadiah dengan tier_min 5000 hanya bisa keluar di spin 5K. Hadiah 1000 bisa keluar di semua tier.\n\n' +
+    'Contoh:\n' +
+    '<code>Canva 1 Bulan | 5000 | email: akun@mail.com pass: rahasia | Hadiah utama\nVoucher kecil | 1000 | Kode: ABC123 | Hadiah ringan</code>\n\n' +
+    'Ketik <code>/cancel</code> untuk batal.';
+
+  return editOrSend(tenant, query, text, adminBackKeyboard());
+}
+
+async function handleAdminAddSpinStockText(tenant, from, chatId, text) {
+  const lines = String(text || '').split('\n').map((line) => line.trim()).filter(Boolean);
+  const prizes = [];
+  const rejected = [];
+  const allowedTiers = new Set([1000, 2000, 3000, 5000]);
+
+  for (const line of lines) {
+    const parts = parsePipeLine(line, 3);
+    if (!parts) { rejected.push(line); continue; }
+    const [name, tierRaw, rewardText, note = ''] = parts;
+    const tierMin = parseNominal(tierRaw);
+    if (!tierMin || !allowedTiers.has(Number(tierMin))) { rejected.push(line); continue; }
+    prizes.push({
+      tenant_id: tenant.id,
+      name,
+      tier_min: Number(tierMin),
+      reward_text: rewardText,
+      note,
+      status: 'available'
+    });
+  }
+
+  if (!prizes.length) {
+    return sendMessage(tenant.bot_token, chatId, '❌ Tidak ada hadiah valid. Format minimal:\n<code>NAMA HADIAH | 1000/2000/3000/5000 | REWARD_TEXT</code>');
+  }
+
+  const { error } = await supabaseAdmin().from('spin_prizes').insert(prizes);
+  if (error) throw error;
+
+  await clearSession(tenant, from.id);
+  return sendMessage(
+    tenant.bot_token,
+    chatId,
+    `✅ <b>Stock Lucky Spin berhasil ditambahkan!</b>\n\nMasuk: <b>${prizes.length}</b> hadiah\n${rejected.length ? `Gagal dibaca: <b>${rejected.length}</b> baris` : 'Semua baris valid.'}`,
+    { reply_markup: inlineKeyboard([[{ text: '🎰 Tambah Lagi', callback_data: 'admin:spinstock' }], [{ text: '👑 Admin Panel', callback_data: 'admin' }]]) }
+  );
+}
+
 async function startEditPrice(tenant, query, productId) {
   if (!ownerOnly(tenant, query.from)) return;
 
@@ -1078,6 +1408,7 @@ async function adminPendingInvoices(tenant, query) {
 async function handleAdminTextSession(tenant, from, chatId, text, session) {
   if (session.state === 'ADMIN_ADD_PRODUCT') return handleAdminAddProductText(tenant, from, chatId, text);
   if (session.state === 'ADMIN_ADD_STOCK') return handleAdminAddStockText(tenant, from, chatId, text, session);
+  if (session.state === 'ADMIN_ADD_SPIN_STOCK') return handleAdminAddSpinStockText(tenant, from, chatId, text);
   if (session.state === 'ADMIN_EDIT_PRICE') return handleAdminEditPriceText(tenant, from, chatId, text, session);
   if (session.state === 'ADMIN_BROADCAST') return handleAdminBroadcastText(tenant, from, chatId, text);
   if (session.state === 'ADMIN_ADJUST_BALANCE') return handleAdminAdjustBalanceText(tenant, from, chatId, text);
@@ -1158,6 +1489,7 @@ async function handleCallback(tenant, update) {
   if (data === 'deposit') return showDeposit(tenant, query);
   if (data === 'history') return history(tenant, query, customer);
   if (data === 'info') return infoBot(tenant, query);
+  if (data === 'spin') return showSpin(tenant, query);
   if (data === 'admin') return adminPanel(tenant, query);
   if (data === 'admin:addproduct') return startAddProduct(tenant, query);
   if (data === 'admin:addstock') return startAddStockProductList(tenant, query);
@@ -1166,6 +1498,7 @@ async function handleCallback(tenant, update) {
   if (data === 'admin:users') return adminUsersPanel(tenant, query);
   if (data === 'admin:balance') return startAdjustBalance(tenant, query);
   if (data === 'admin:pending') return adminPendingInvoices(tenant, query);
+  if (data === 'admin:spinstock') return startAddSpinStock(tenant, query);
 
   if (data.startsWith('admin:product:')) {
     return adminProductMenu(tenant, query, data.split(':')[2]);
@@ -1191,8 +1524,40 @@ async function handleCallback(tenant, update) {
     return updateQty(tenant, query, data.split(':')[1]);
   }
 
-  if (data === 'buy:confirm') {
+  if (data === 'buy:confirm' || data === 'buy:saldo') {
     return confirmOrder(tenant, query);
+  }
+
+  if (data === 'buy:qris') {
+    return createDirectProductPayment(tenant, query, customer);
+  }
+
+  if (data.startsWith('directpaycheck:')) {
+    return checkDirectOrderPayment(tenant, query, data.split(':')[1]);
+  }
+
+  if (data.startsWith('directpaycancel:')) {
+    return cancelDirectOrderPayment(tenant, query, data.split(':')[1]);
+  }
+
+  if (data.startsWith('spin:tier:')) {
+    return showSpinPaymentOptions(tenant, query, Number(data.split(':')[2]));
+  }
+
+  if (data.startsWith('spin:saldo:')) {
+    return spinPaySaldo(tenant, query, customer, Number(data.split(':')[2]));
+  }
+
+  if (data.startsWith('spin:qris:')) {
+    return spinPayQris(tenant, query, customer, Number(data.split(':')[2]));
+  }
+
+  if (data.startsWith('spinpaycheck:')) {
+    return checkSpinPayment(tenant, query, data.split(':')[1]);
+  }
+
+  if (data.startsWith('spincancel:')) {
+    return cancelSpinPayment(tenant, query, data.split(':')[1]);
   }
 
   if (data.startsWith('deposit:')) {

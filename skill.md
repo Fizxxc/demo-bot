@@ -41,3 +41,12 @@ Before zipping:
 3. ensure `design.md` and `skill.md` are updated
 4. ensure mascot assets are `.webp` and transparent
 5. never include `node_modules` or `.next` in zip
+
+## Bot Commerce Skill
+
+- Produk harus bisa dibayar via saldo dan QRIS langsung.
+- Jangan paksa user deposit jika transaksi bisa dibuat sebagai QRIS direct order.
+- Semua invoice QRIS bot harus bisa dicek via tombol `Cek Pembayaran` dan webhook Pakasir.
+- Lucky Spin adalah paid random reward, bukan giveaway gratis.
+- Hadiah spin harus berasal dari `spin_prizes` agar owner bisa mengatur stok hadiah.
+- Jika QRIS produk sukses tapi stok habis, refund otomatis ke saldo user.

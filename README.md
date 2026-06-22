@@ -437,3 +437,36 @@ limit 20;
 ```
 
 Kalau query itu kosong, berarti submit e-wallet belum masuk ke database. Kalau ada isinya, halaman owner sekarang harus menampilkannya.
+
+## Update Bot: QRIS Direct Order + Lucky Spin
+
+Versi ini menambahkan fitur bot Telegram:
+
+- Pembelian produk bisa dibayar memakai **Saldo** atau **QRIS langsung**.
+- User tidak wajib deposit dulu jika memilih QRIS langsung.
+- Setelah pembayaran QRIS produk sukses, akun langsung dikirim sebagai file `.txt`.
+- Jika stok habis saat QRIS sudah dibayar, nominal otomatis dikembalikan ke saldo user bot.
+- Fitur **Lucky Spin** berbayar:
+  - Rp1.000: peluang kecil, bisa zonk.
+  - Rp2.000: peluang lebih baik.
+  - Rp3.000: peluang sedang.
+  - Rp5.000: peluang terbesar.
+- Lucky Spin bisa dibayar via saldo atau QRIS langsung.
+- Owner bisa menambah stock hadiah spin dari Telegram Admin Panel → Stock Spin.
+
+Jalankan migration tambahan sebelum deploy fitur ini:
+
+```sql
+-- Supabase SQL Editor
+-- jalankan file ini:
+supabase/migrations_bot_qris_spin.sql
+```
+
+Format tambah stock Lucky Spin via Telegram owner:
+
+```txt
+Canva 1 Bulan | 5000 | email: akun@mail.com pass: rahasia | Hadiah utama
+Voucher kecil | 1000 | Kode: ABC123 | Hadiah ringan
+```
+
+Catatan: `tier_min` menentukan tier minimal hadiah bisa keluar. Hadiah `1000` bisa keluar di semua tier, hadiah `5000` hanya bisa keluar di spin 5K.

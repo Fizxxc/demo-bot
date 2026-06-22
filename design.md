@@ -52,3 +52,10 @@ Mapping:
 - Help widget appears for active merchant users.
 - It provides prompt chips at the top/side and submits to SATSKO.
 - Every widget message is saved into Live Chat for history.
+
+## Telegram Bot Interaction Pattern
+
+- Menu utama bot harus tetap ringkas: produk, stok, deposit, riwayat, lucky spin, info.
+- Saat membeli produk, tampilkan pilihan `Bayar Saldo` dan `Bayar QRIS`.
+- Lucky Spin harus memakai animasi teks bertahap sebelum hasil dikirim.
+- Hasil lucky spin langsung dikirim ke chat; hadiah dikirim sebagai file `.txt`.
