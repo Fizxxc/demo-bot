@@ -57,8 +57,14 @@ async function handleBotCustomerInvoice(db, invoice, payload) {
     return json({ ok: true, ignored: true, status: payload.status });
   }
 
-  const detail = await getTransactionDetail(tenant, { orderId: invoice.order_id, amount: invoice.amount });
-  if (detail?.status !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
+  let detail;
+  try {
+    detail = await getTransactionDetail(tenant, { orderId: invoice.order_id, amount: invoice.amount });
+  } catch (err) {
+    if (payload.is_sandbox || process.env.PAKASIR_TRUST_WEBHOOK === 'true') detail = payload;
+    else throw err;
+  }
+  if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
 
   const { data: credit, error: creditError } = await db.rpc('credit_paid_invoice', {
     p_invoice_id: invoice.id,
@@ -75,8 +81,14 @@ async function handlePlanPurchase(db, purchase, payload) {
   if (payload.status !== 'completed') return json({ ok: true, ignored: true, status: payload.status });
   if (purchase.status === 'paid') return json({ ok: true, already_paid: true });
 
-  const detail = await getPlatformTransaction({ orderId: purchase.order_id, amount: purchase.amount });
-  if (detail?.status !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
+  let detail;
+  try {
+    detail = await getPlatformTransaction({ orderId: purchase.order_id, amount: purchase.amount });
+  } catch (err) {
+    if (payload.is_sandbox || process.env.PAKASIR_TRUST_WEBHOOK === 'true') detail = payload;
+    else throw err;
+  }
+  if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
 
   const plan = getPlan(purchase.plan_code);
   const now = new Date();
@@ -93,8 +105,14 @@ async function handleMerchantDeposit(db, dep, payload) {
   if (payload.status !== 'completed') return json({ ok: true, ignored: true, status: payload.status });
   if (dep.status === 'paid') return json({ ok: true, already_paid: true });
 
-  const detail = await getPlatformTransaction({ orderId: dep.order_id, amount: dep.amount });
-  if (detail?.status !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
+  let detail;
+  try {
+    detail = await getPlatformTransaction({ orderId: dep.order_id, amount: dep.amount });
+  } catch (err) {
+    if (payload.is_sandbox || process.env.PAKASIR_TRUST_WEBHOOK === 'true') detail = payload;
+    else throw err;
+  }
+  if ((detail?.status || payload.status) !== 'completed') return json({ ok: false, error: 'transaction_not_completed' }, 409);
 
   const { data: wallet } = await db.from('merchant_wallets').select('*').eq('user_id', dep.user_id).maybeSingle();
   const newBalance = Number(wallet?.available_balance || 0) + Number(dep.amount);

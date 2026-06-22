@@ -12,7 +12,10 @@ const required = [
   'public/assets/mascots/celebrate-jump.webp',
   'public/assets/mascots/profile-thumbs-up.webp',
   'public/assets/mascots/presenter-point.webp',
-  'public/assets/mascots/wave-hello.webp'
+  'public/assets/mascots/wave-hello.webp',
+  'src/components/HelpWidget.js',
+  'src/app/api/web/chat/widget/route.js',
+  'src/lib/paymentNormalize.js'
 ];
 
 const missing = required.filter((file) => !fs.existsSync(file));

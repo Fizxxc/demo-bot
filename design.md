@@ -1,63 +1,54 @@
-# Kograph UI Design System
+# Kograph Market — UI Design System
+
+## Direction
+This UI uses the provided `referensi.txt` as the visual direction: soft grey page background, white cards, clean spacing, strong blue primary actions, rounded controls, and simple creator-platform style hierarchy.
 
 ## Design Name
-**Asphalt Design System**
+**Kograph Soft Asphalt System**
 
-## Core Principles
-1. **Clean control surface** — use white / blue surfaces with subtle depth.
-2. **Operational clarity** — dashboard feels like a control room, not a noisy landing page.
-3. **Consistent spacing** — rounded cards, compact sections, and visible hierarchy.
-4. **Mobile-first navigation** — desktop uses sidebar, mobile uses bottom navigation.
-5. **Mascot-assisted UX** — each major page uses a mascot pose that matches the page purpose.
-
-## Color Tokens
-- Primary: `#0756c9`
-- Primary Bright: `#2f8cff`
-- Surface: `#ffffff`
-- Surface Soft: `#eef5ff`
-- Background: `#f7fbff`
-- Ink: `#102341`
-- Muted: `#64748b`
-- Border: `#dbe8ff`
+## Core Tokens
+- Page background: `#E8E8E8`
+- Primary brand: `#2C5BFF`
+- Primary hover: `#1f48d8`
+- Text primary: `#0f172a`
+- Text secondary: `#334155`
+- Muted text: `#64748b`
+- Card background: `#FFFFFF`
+- Card border: `#f1f5f9`
 - Success: `#0f9f6e`
 - Warning: `#d99000`
 - Danger: `#e63d55`
 
 ## Layout Rules
-- Desktop shell: fixed left sidebar + main content.
-- Mobile shell: hide sidebar, show bottom nav.
-- Page header always uses eyebrow + title + short supporting text.
-- Cards use 20–28px radius with soft shadow.
-- Prefer 2-column grids on desktop and 1-column on mobile.
+- Public landing page uses soft grey background and white cards.
+- Desktop app uses left sidebar.
+- Mobile app uses bottom navigation.
+- Cards stay white with subtle shadows.
+- Use blue only for primary actions, badges, progress, and important links.
+- Terminal keeps dark contrast because it represents runtime/process logs.
+- Chat bubbles keep sender on the right and receiver/AI on the left.
 
-## Mascot Mapping
+## Mascot Rules
+Mascots must use transparent background `.webp` images in `public/assets/mascots`.
+
+Mapping:
 - Dashboard: `support-laptop.webp`
-- Products / stock flow: `products-run-box.webp`
-- Terminal / bot runtime: `celebrate-jump.webp`
-- Profile: `profile-thumbs-up.webp`
-- Owner / explanation pages: `presenter-point.webp`
-- Support / welcome: `wave-hello.webp`
+- Product/stock: `products-run-box.webp`
+- Terminal/runtime: `celebrate-jump.webp`
+- Profile/trust: `profile-thumbs-up.webp`
+- Owner/settings/explanation: `presenter-point.webp`
+- Support/e-wallet/help: `wave-hello.webp`
 
-## UI Components
-- `card`
-- `stat`
-- `badge`
-- `pill`
-- `bottom-nav`
-- `mascot-card`
-- `progress-shell`
-- `terminal-card`
-- `chat-card`
+## Payment UI Rules
+- QRIS image must be generated through `/api/web/billing/qris/[id]`.
+- If QR payload is missing, show a clear QR placeholder instead of broken image.
+- Billing page must show Order ID, nominal, total bayar, status, and help link.
 
-## Do
-- Keep the palette blue / white.
-- Use soft gradients only as accents.
-- Keep CTA buttons primary blue.
-- Keep chat layout sender right, receiver left.
-- Keep terminal dark for contrast.
+## Loading Rules
+- Loading screen appears only once on first entry per browser session.
+- Do not show loading overlay on every page navigation.
 
-## Avoid
-- Random colors outside the design token set.
-- Changing component radius inconsistently.
-- Replacing mobile bottom nav with top nav.
-- Removing mascot placements without replacing their contextual purpose.
+## Help Widget Rules
+- Help widget appears for active merchant users.
+- It provides prompt chips at the top/side and submits to SATSKO.
+- Every widget message is saved into Live Chat for history.

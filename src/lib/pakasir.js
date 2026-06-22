@@ -1,6 +1,7 @@
 import { pakasirFallbackConfig } from './config.js';
+import { normalizePaymentResponse } from './paymentNormalize.js';
 
-const BASE_URL = 'https://app.pakasir.com';
+const BASE_URL = process.env.PAKASIR_BASE_URL || 'https://app.pakasir.com';
 
 export function getPakasirConfig(tenant) {
   const fallback = pakasirFallbackConfig();
@@ -47,7 +48,14 @@ export async function createQrisTransaction(tenant, { orderId, amount }) {
     api_key: config.apiKey
   });
 
-  return data.payment;
+  const payment = normalizePaymentResponse(data, amount);
+  if (!payment.payment_number) {
+    const err = new Error('Payload QRIS dari Pakasir kosong. Cek project slug, API key, dan mode sandbox/production Pakasir.');
+    err.status = 502;
+    err.body = data;
+    throw err;
+  }
+  return payment;
 }
 
 export async function getTransactionDetail(tenant, { orderId, amount }) {

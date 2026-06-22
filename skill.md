@@ -1,60 +1,43 @@
-# Kograph UI Skill Guide
+# Kograph Market — Development Skill Guide
 
-This file acts as a guardrail so future updates keep the UI consistent.
+## 1. Use Referensi Correctly
+Use `referensi.txt` as visual direction, not as a command to replace the whole framework. This project remains Next.js because the bot, Supabase routes, webhooks, and dashboard already depend on it.
 
-## 1. Navigation Skill
-- Desktop navigation stays in the sidebar.
-- Mobile navigation stays in the fixed bottom navbar.
-- Main merchant tabs should remain:
-  - Dashboard
-  - Terminal
-  - Products
-  - Wallet
-  - Support
-  - Profile
+## 2. Keep Colors Stable
+Always preserve:
+- background `#E8E8E8`
+- primary `#2C5BFF`
+- hover `#1f48d8`
+- card background `#FFFFFF`
 
-## 2. Component Skill
-When building a new page, compose the page using:
-- `topbar`
-- `card`
-- `stat`
-- `grid`
-- `badge` or `pill`
-- `mascot-card` for hero/supportive visual
+## 3. Mascot Skill
+Use transparent `.webp` mascot assets only. Do not re-add white backgrounds.
 
-## 3. Typography Skill
-- Titles should be short, direct, and operational.
-- Supporting copy should explain the feature in one or two lines.
-- Avoid long paragraphs in dashboard surfaces.
+## 4. AI Skill
+SATSKO must never answer only with “AI sedang tidak terhubung.” If Hugging Face token/API fails, use the local SATSKO knowledge fallback with useful troubleshooting.
 
-## 4. Profile Skill
-The profile page should always preserve:
-- account overview
-- password change
-- notification preferences
-- wallet / e-wallet status
-- quick help links
+## 5. Payment Skill
+Pakasir response shapes may differ. Always normalize QR fields through `src/lib/paymentNormalize.js` and render with `src/lib/qrisImage.js`.
 
-## 5. Mascot Skill
-Always match mascot pose to page context:
-- explaining = presenter
-- helping/chat = wave or laptop support
-- success/runtime = celebrate
-- profile/trust = thumbs up
-- delivery/product flow = running with box
+## 6. QRIS Skill
+If Pakasir returns raw QR text, generate QR. If Pakasir returns image URL/data image, composite that image. If no QR is returned, show a clear placeholder.
 
-## 6. Responsive Skill
-Every new page must:
-- stack to one column on mobile,
-- keep tap targets large,
-- preserve card spacing,
-- avoid horizontal overflow,
-- respect the bottom-nav safe area.
+## 7. Loading Skill
+Do not bind loading screen to route clicks/forms. Show it only on initial page load using sessionStorage.
 
-## 7. Safe Update Rules
-Before changing the UI:
-1. reuse existing design tokens,
-2. keep white-blue palette,
-3. maintain rounded card language,
-4. do not remove bottom nav on mobile,
-5. keep terminal and chat visual identity distinct.
+## 8. Live Chat Skill
+Use Help Widget for quick prompts and full Support page for chat history. Widget submits to `/api/web/chat/widget`.
+
+## 9. Responsive Skill
+- Desktop: sidebar.
+- Mobile: bottom nav.
+- Avoid horizontal overflow.
+- Tables must live inside `.table-wrap`.
+
+## 10. Release Checklist
+Before zipping:
+1. run `npm install`
+2. run `npm run check`
+3. ensure `design.md` and `skill.md` are updated
+4. ensure mascot assets are `.webp` and transparent
+5. never include `node_modules` or `.next` in zip

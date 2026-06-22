@@ -1,29 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
 
 export default function RouteLoading() {
-  const pathname = usePathname();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setLoading(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    const show = (event) => {
-      const link = event.target?.closest?.('a');
-      if (link && link.href && link.origin === location.origin && !link.href.includes('#')) setLoading(true);
-    };
-    const submit = () => setLoading(true);
-    document.addEventListener('click', show);
-    document.addEventListener('submit', submit);
-    return () => {
-      document.removeEventListener('click', show);
-      document.removeEventListener('submit', submit);
-    };
+    if (typeof window === 'undefined') return;
+    const key = 'kograph_initial_loading_done';
+    if (sessionStorage.getItem(key)) return;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      sessionStorage.setItem(key, '1');
+      setLoading(false);
+    }, 850);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!loading) return null;
-  return <div className="loading-screen"><div className="loading-glow" /><div className="loading-card">Memuat...</div></div>;
+  return <div className="loading-screen"><div className="loading-glow" /><div className="loading-card">Memuat Kograph...</div></div>;
 }

@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
 import { pakasirFallbackConfig } from './config.js';
+import { normalizePaymentResponse } from './paymentNormalize.js';
+
+const BASE_URL = process.env.PAKASIR_BASE_URL || 'https://app.pakasir.com';
 
 export function platformOrderId(prefix = 'WEB') {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');
@@ -15,7 +18,7 @@ export async function createPlatformQris({ orderId, amount }) {
     throw err;
   }
 
-  const res = await fetch('https://app.pakasir.com/api/transactioncreate/qris', {
+  const res = await fetch(`${BASE_URL}/api/transactioncreate/qris`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -33,7 +36,14 @@ export async function createPlatformQris({ orderId, amount }) {
     err.body = data;
     throw err;
   }
-  return data.payment;
+  const payment = normalizePaymentResponse(data, amount);
+  if (!payment.payment_number) {
+    const err = new Error('Payload QRIS dari Pakasir kosong. Cek PAKASIR_PROJECT_SLUG, PAKASIR_API_KEY, dan mode project Pakasir.');
+    err.status = 502;
+    err.body = data;
+    throw err;
+  }
+  return payment;
 }
 
 export async function getPlatformTransaction({ orderId, amount }) {
@@ -44,7 +54,7 @@ export async function getPlatformTransaction({ orderId, amount }) {
     order_id: orderId,
     api_key: config.apiKey
   });
-  const res = await fetch(`https://app.pakasir.com/api/transactiondetail?${params.toString()}`);
+  const res = await fetch(`${BASE_URL}/api/transactiondetail?${params.toString()}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || 'Gagal cek transaksi platform');
   return data.transaction;
